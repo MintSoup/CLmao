@@ -1,0 +1,43 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build and run",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-O3",
+                "main.c",
+                "chunk.c",
+                "mem.c",
+                "dbg.c",
+                "value.c",
+                "-o",
+                "main.exe",
+                "&&",
+                "./main.exe"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "build for debug",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-g",
+                "-Og",
+                "main.c",
+                "chunk.c",
+                "mem.c",
+                "dbg.c",
+                "value.c",
+                "-o",
+                "main.exe"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
