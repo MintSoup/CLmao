@@ -12,6 +12,7 @@
                 "mem.c",
                 "dbg.c",
                 "value.c",
+                "vm.c",
                 "-o",
                 "main.exe",
                 "&&",
@@ -34,6 +35,7 @@
                 "mem.c",
                 "dbg.c",
                 "value.c",
+                "vm.c",
                 "-o",
                 "main.exe"
             ],
