@@ -70,9 +70,21 @@ static InterpretResult run() {
 	}
 }
 
-InterpretResult interpret(const char* src) {
-	compile(src);
-	return INTERPRET_OK;
+InterpretResult interpret(const char *src) {
+	Chunk chunk;
+	initChunk(&chunk);
+
+	if (!compile(src, &chunk)) {
+		freeChunk(&chunk);
+		return INTERPRET_COMPILE_ERROR;
+	}
+	vm.chunk = &chunk;
+	vm.ip = vm.chunk->code;
+
+	InterpretResult res = run();
+	freeChunk(&chunk);
+
+	return res;
 }
 
 static void resetStack() { vm.stackTop = vm.stack; }

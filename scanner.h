@@ -16,7 +16,6 @@ typedef enum {
 	TOKEN_SEMICOLON,
 	TOKEN_SLASH,
 	TOKEN_STAR,
-	TOKEN_PERCENT,
 
 	// One or two character tokens.
 	TOKEN_BANG,
@@ -64,18 +63,4 @@ typedef struct {
 
 void initScanner(const char *src);
 Token scanToken();
-static bool isAtEnd();
-static Token makeToken(TokenType type);
-static Token errorToken(char *msg);
-static char advance();
-static bool match(char t);
-static void skipWhitespace();
-static char peek();
-static char peekNext();
-static bool isDigit(char c);
-static bool isAlpha(char c);
-static bool isAlphaNumeric(char c);
-static TokenType identifierType();
-static TokenType checkKeyword(int start, int len, const char *rest,
-							  TokenType type);
 #endif

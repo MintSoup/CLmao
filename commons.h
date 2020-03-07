@@ -6,5 +6,6 @@
 #include <stdbool.h>
 
 // #define DEBUG_TRACE_EXECUTION
+#define DEBUG_TRACE_BYTECODE
 
 #endif

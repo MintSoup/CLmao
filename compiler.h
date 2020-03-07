@@ -1,8 +1,14 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+
 #include "scanner.h"
-void compile(const char* src);
+#include "commons.h"
+#include "chunk.h"
+#include "vm.h"
+
+
+bool compile(const char* src ,Chunk* chunk);
 
 
 #endif

@@ -1,6 +1,1 @@
-let a = 3;
-func hello(){
-    while(a < 3){
-        if(a > 8) return this print;
-    }
-}
+3 + 5 * 6
