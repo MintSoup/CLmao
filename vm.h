@@ -27,5 +27,6 @@ InterpretResult interpret(const char *src);
 void push(Value val);
 Value pop();
 static void resetStack();
-
+static Value peek(int distance);
+static void runtimeError(const char *format, ...);
 #endif

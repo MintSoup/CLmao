@@ -11,7 +11,17 @@ typedef enum {
 	OP_BIN_SUB,
 	OP_BIN_MUL,
 	OP_BIN_DIV,
-	OP_PRINT
+	OP_PRINT,
+	OP_TRUE,
+	OP_FALSE,
+	OP_NULL,
+	OP_NOT,
+	OP_EQUALS,
+	OP_NOT_EQUALS,
+	OP_LESS,
+	OP_LESS_EQUAL,
+	OP_GREATER,
+	OP_GREATER_EQUAL
 } OpCode;
 
 typedef struct {

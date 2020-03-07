@@ -42,8 +42,44 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_BIN_DIV: {
 		return simpleInstruction("OP_BIN_DIV", offset);
 	}
+	case OP_FALSE: {
+		return simpleInstruction("OP_FALSE", offset);
+	}
+	case OP_TRUE: {
+		return simpleInstruction("OP_TRUE", offset);
+	}
+	case OP_NULL: {
+		return simpleInstruction("OP_NULL", offset);
+	}
+	case OP_NOT: {
+		return simpleInstruction("OP_NOT", offset);
+	}
 	case OP_PRINT: {
 		return simpleInstruction("OP_PRINT", offset);
+	}
+	case OP_EQUALS: {
+		return simpleInstruction("OP_EQUALS", offset);
+		break;
+	}
+	case OP_NOT_EQUALS: {
+		return simpleInstruction("OP_NOT_EQUALS", offset);
+		break;
+	}
+	case OP_GREATER: {
+		return simpleInstruction("OP_GREATER", offset);
+		break;
+	}
+	case OP_LESS: {
+		return simpleInstruction("OP_LESS", offset);
+		break;
+	}
+	case OP_GREATER_EQUAL: {
+		return simpleInstruction("OP_GREATER_EQUAL", offset);
+		break;
+	}
+	case OP_LESS_EQUAL: {
+		return simpleInstruction("OP_LESS_EQUAL", offset);
+		break;
 	}
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);
