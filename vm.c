@@ -2,6 +2,7 @@
 #include "commons.h"
 #include "dbg.h"
 #include <stdio.h>
+#include "compiler.h"
 
 VM vm;
 
@@ -69,10 +70,9 @@ static InterpretResult run() {
 	}
 }
 
-InterpretResult interpret(Chunk *chunk) {
-	vm.chunk = chunk;
-	vm.ip = vm.chunk->code;
-	return run();
+InterpretResult interpret(const char* src) {
+	compile(src);
+	return INTERPRET_OK;
 }
 
 static void resetStack() { vm.stackTop = vm.stack; }

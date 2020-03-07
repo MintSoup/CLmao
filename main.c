@@ -1,34 +1,65 @@
-#include "commons.h"
-#include <stdio.h>
-
 #include "chunk.h"
+#include "commons.h"
 #include "dbg.h"
 #include "vm.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-int main() {
-	Chunk c;
-	initChunk(&c);
+void runFile(char *name);
+char *readFile(char *name);
 
+int main(int argc, char *argv[]) {
 	initVM();
-	writeChunk(&c, OP_CONSTANT, 14);
-	writeChunk(&c, addConstant(&c, -10), 14);
-	writeChunk(&c, OP_CONSTANT, 13);
-	writeChunk(&c, addConstant(&c, 5), 13);
-	writeChunk(&c, OP_CONSTANT, 13);
-	writeChunk(&c, addConstant(&c, 4), 13);
-	writeChunk(&c, OP_BIN_MUL, 13);
-	writeChunk(&c, OP_NEGATE, 14);
+#ifndef DEBUG_BUILD
 
-	writeChunk(&c, OP_BIN_DIV, 14);
-	writeChunk(&c, OP_PRINT, 14);
-	disassembleChunk(&c, "test chunk");
+	if (argc == 1) {
+		printf("Usage: lmao <filename>\n");
+		return 1;
+	} else if (argc == 2) {
+		runFile(argv[1]);
+	}
 
-	puts("----------------------------------------------------------");
-
-	interpret(&c);
-
-	freeChunk(&c);
-	freeVM();
-
+#else
+	runFile("test.lmao");
+#endif
 	return 0;
+}
+
+char *readFile(char *name) {
+	FILE *f = fopen(name, "rb");
+	if (f == NULL) {
+		fprintf(stderr, "Cannot open file: %s\n", name);
+		exit(1);
+	}
+	fseek(f, 0, SEEK_END);
+	size_t size = ftell(f);
+	rewind(f);
+	char *buf = (char *)malloc(size + 1);
+	if (buf == NULL) {
+		fprintf(stderr, "Not enough memory to read file\n", name);
+		exit(1);
+	}
+	size_t bytesRead = fread(buf, sizeof(char), size, f);
+	if (bytesRead < size) {
+		fprintf(stderr, "File read failed\n");
+	}
+	fclose(f);
+	buf[size] = 0;
+	return buf;
+}
+
+void runFile(char *name) {
+	char *src = readFile(name);
+
+	
+	InterpretResult i = interpret(src);
+	free(src);
+
+	if (i == INTERPRET_OK) {
+
+	} else if (i == INTERPRET_COMPILE_ERROR) {
+		exit(69);
+	} else if (i == INTERPRET_RUNTIME_ERROR) {
+		exit(420);
+	}
 }

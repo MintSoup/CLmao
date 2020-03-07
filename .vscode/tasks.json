@@ -13,10 +13,13 @@
                 "dbg.c",
                 "value.c",
                 "vm.c",
+                "compiler.c",
+                "scanner.c",
                 "-o",
                 "main.exe",
                 "&&",
-                "./main.exe"
+                "./main.exe",
+                "test.lmao"
             ],
             "group": {
                 "kind": "build",
@@ -30,12 +33,15 @@
             "args": [
                 "-g",
                 "-Og",
+                "-DDEBUG_BUILD",
                 "main.c",
                 "chunk.c",
                 "mem.c",
                 "dbg.c",
                 "value.c",
                 "vm.c",
+                "compiler.c",
+                "scanner.c",
                 "-o",
                 "main.exe"
             ],
