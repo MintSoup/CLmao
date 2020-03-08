@@ -20,7 +20,7 @@ typedef enum {
 	PREC_EQUALITY,   // == !=
 	PREC_COMPARISON, // < > <= >=
 	PREC_TERM,		 // + -
-	PREC_FACTOR,	 // * / %
+	PREC_FACTOR,	 // *
 	PREC_UNARY,		 // ! -
 	PREC_CALL,		 // . ()
 	PREC_PRIMARY
@@ -182,6 +182,8 @@ static void string() {
 											 parser.previous.length - 2)));
 }
 
+static void factorial() { emitByte(OP_FACTORIAL); }
+
 static void unary() {
 	TokenType operandType = parser.previous.type;
 	parsePrecedence(PREC_UNARY);
@@ -209,7 +211,7 @@ ParseRule rules[] = {
 	{NULL, NULL, PREC_NONE},		 // TOKEN_SEMICOLON
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_SLASH
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_STAR
-	{unary, NULL, PREC_NONE},		 // TOKEN_BANG
+	{unary, factorial, PREC_UNARY},  // TOKEN_BANG
 	{NULL, binary, PREC_EQUALITY},   // TOKEN_BANG_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_EQUAL
 	{NULL, binary, PREC_EQUALITY},   // TOKEN_EQUAL_EQUAL
@@ -218,8 +220,8 @@ ParseRule rules[] = {
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_LESS
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_LESS_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_IDENTIFIER
-	{string, NULL, PREC_NONE},		 // TOKEN_STRING
-	{number, NULL, PREC_NONE},		 // TOKEN_NUMBER
+	{string, NULL, PREC_PRIMARY},		 // TOKEN_STRING
+	{number, NULL, PREC_PRIMARY},		 // TOKEN_NUMBER
 	{NULL, NULL, PREC_NONE},		 // TOKEN_AND
 	{NULL, NULL, PREC_NONE},		 // TOKEN_CLASS
 	{NULL, NULL, PREC_NONE},		 // TOKEN_ELSE
@@ -248,7 +250,7 @@ static void parsePrecedence(Precedence p) {
 		return;
 	}
 	prefixRule();
-	while (p <= getRule(parser.current.type)->precedence) {
+	while (getRule(parser.current.type)->precedence >= p) {
 		advance();
 		ParseFn infixRule = getRule(parser.previous.type)->infix;
 		infixRule();

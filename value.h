@@ -2,6 +2,7 @@
 #define VALUE_H
 
 #include "commons.h"
+#include "math.h"
 #include "value.h"
 
 typedef struct sObj Obj;
@@ -30,12 +31,13 @@ typedef struct {
 #define AS_STRING(x) ((ObjString *)AS_OBJ(x))
 #define AS_CSTRING(x) (AS_STRING(x)->chars)
 
-
 #define IS_NULL(x) ((x).type == VAL_NULL)
 #define IS_NUM(x) ((x).type == VAL_NUM)
 #define IS_BOOL(x) ((x).type == VAL_BOOL)
 #define IS_OBJ(x) ((x).type == VAL_OBJ)
 
+#define IS_INT(x)                                                              \
+	(IS_NUM(x) && fabs(round(AS_NUM(x)) - AS_NUM(x)) <= 0.0000001)
 
 #define BOOL_VALUE(x) ((Value){VAL_BOOL, {.boolean = x}})
 #define NUM_VALUE(x) ((Value){VAL_NUM, {.number = x}})

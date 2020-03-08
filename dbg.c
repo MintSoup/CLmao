@@ -81,6 +81,10 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 		return simpleInstruction("OP_LESS_EQUAL", offset);
 		break;
 	}
+	case OP_FACTORIAL: {
+		return simpleInstruction("OP_FACTORIAL", offset);
+		break;
+	}
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);
 		return offset + 1;

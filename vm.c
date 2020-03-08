@@ -4,6 +4,7 @@
 #include "dbg.h"
 #include "mem.h"
 #include "object.h"
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -147,6 +148,21 @@ static InterpretResult run() {
 		}
 		case OP_LESS_EQUAL: {
 			BINARY_OPERATOR(<=, BOOL_VALUE);
+			break;
+		}
+		case OP_FACTORIAL: {
+			Value v = peek(0);
+			if (IS_INT(v) && (round(AS_NUM(v)) >= 0)) {
+				double value = AS_NUM(pop());
+				int output = 1;
+				for (int i = 2; i <= value; i++) {
+					output *= i;
+				}
+				push(NUM_VALUE((double)output));
+			} else {
+				runtimeError("Factorial can only be used on positive integers");
+				return INTERPRET_RUNTIME_ERROR;
+			}
 			break;
 		}
 		case OP_PRINT: {
