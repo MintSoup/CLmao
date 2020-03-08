@@ -30,16 +30,16 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_NEGATE: {
 		return simpleInstruction("OP_NEGATE", offset);
 	}
-	case OP_BIN_ADD: {
+	case OP_ADD: {
 		return simpleInstruction("OP_BIN_ADD", offset);
 	}
-	case OP_BIN_SUB: {
+	case OP_SUB: {
 		return simpleInstruction("OP_BIN_SUB", offset);
 	}
-	case OP_BIN_MUL: {
+	case OP_MUL: {
 		return simpleInstruction("OP_BIN_MUL", offset);
 	}
-	case OP_BIN_DIV: {
+	case OP_DIV: {
 		return simpleInstruction("OP_BIN_DIV", offset);
 	}
 	case OP_FALSE: {

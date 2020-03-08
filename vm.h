@@ -11,7 +11,10 @@ typedef struct {
 	uint8_t *ip;
 	Value stack[STACK_MAX];
 	Value *stackTop;
+	Obj *objects;
 } VM;
+
+extern VM vm;
 
 typedef enum {
 	INTERPRET_OK,
@@ -29,4 +32,5 @@ Value pop();
 static void resetStack();
 static Value peek(int distance);
 static void runtimeError(const char *format, ...);
+
 #endif

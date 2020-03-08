@@ -1,8 +1,9 @@
-#include <stdio.h>
-#include "commons.h"
 #include "compiler.h"
-#include <stdlib.h>
+#include "commons.h"
 #include "dbg.h"
+#include "object.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct {
 	Token previous;
@@ -120,16 +121,16 @@ static void binary() {
 
 	switch (operator) {
 	case TOKEN_PLUS:
-		emitByte(OP_BIN_ADD);
+		emitByte(OP_ADD);
 		break;
 	case TOKEN_MINUS:
-		emitByte(OP_BIN_SUB);
+		emitByte(OP_SUB);
 		break;
 	case TOKEN_STAR:
-		emitByte(OP_BIN_MUL);
+		emitByte(OP_MUL);
 		break;
 	case TOKEN_SLASH:
-		emitByte(OP_BIN_DIV);
+		emitByte(OP_DIV);
 		break;
 	case TOKEN_LESS:
 		emitByte(OP_LESS);
@@ -176,6 +177,11 @@ static void number() {
 	emitConstant(NUM_VALUE(value));
 }
 
+static void string() {
+	emitConstant(OBJ_VALUE((Obj *)copyString(parser.previous.start + 1,
+											 parser.previous.length - 2)));
+}
+
 static void unary() {
 	TokenType operandType = parser.previous.type;
 	parsePrecedence(PREC_UNARY);
@@ -212,7 +218,7 @@ ParseRule rules[] = {
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_LESS
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_LESS_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_IDENTIFIER
-	{NULL, NULL, PREC_NONE},		 // TOKEN_STRING
+	{string, NULL, PREC_NONE},		 // TOKEN_STRING
 	{number, NULL, PREC_NONE},		 // TOKEN_NUMBER
 	{NULL, NULL, PREC_NONE},		 // TOKEN_AND
 	{NULL, NULL, PREC_NONE},		 // TOKEN_CLASS

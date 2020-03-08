@@ -1,15 +1,21 @@
 #include "vm.h"
 #include "commons.h"
-#include "dbg.h"
-#include <stdio.h>
 #include "compiler.h"
+#include "dbg.h"
+#include "mem.h"
+#include "object.h"
 #include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 VM vm;
 
-void initVM() { resetStack(); }
+void initVM() {
+	resetStack();
+	vm.objects = NULL;
+}
 
-void freeVM() {}
+void freeVM() { freeObjects(); }
 
 static bool isTruthy(Value v) {
 	switch (v.type) {
@@ -22,17 +28,18 @@ static bool isTruthy(Value v) {
 	}
 }
 
-static bool equal(Value a, Value b) {
-	if (a.type != b.type)
-		return false;
-	switch (a.type) {
-	case VAL_BOOL:
-		return AS_BOOL(a) == AS_BOOL(b);
-	case VAL_NULL:
-		return true;
-	case VAL_NUM:
-		return AS_NUM(a) == AS_NUM(b);
-	}
+static void concat() {
+	ObjString *str2 = AS_STRING(pop());
+	ObjString *str1 = AS_STRING(pop());
+
+	size_t len = str1->length + str2->length;
+	char *newStr = ALLOCATE(char, len + 1);
+
+	memcpy(newStr, str1->chars, str1->length);
+	memcpy(newStr + str1->length, str2->chars, str2->length + 1);
+
+	ObjString *new = takeString(newStr, len);
+	push(OBJ_VALUE((Obj *)new));
 }
 
 static InterpretResult run() {
@@ -42,7 +49,7 @@ static InterpretResult run() {
 #define BINARY_OPERATOR(o, valueType)                                          \
 	do {                                                                       \
 		if (!(IS_NUM(peek(0)) && IS_NUM(peek(1)))) {                           \
-			runtimeError("Both operands must be numbers");                     \
+			runtimeError("Operation not supported on those types");            \
 			return INTERPRET_RUNTIME_ERROR;                                    \
 		}                                                                      \
 		double b = AS_NUM(pop());                                              \
@@ -81,19 +88,24 @@ static InterpretResult run() {
 			push(NUM_VALUE(-AS_NUM(pop())));
 			break;
 		}
-		case OP_BIN_ADD: {
-			BINARY_OPERATOR(+, NUM_VALUE);
+		case OP_ADD: {
+			if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+				concat();
+			} else {
+				BINARY_OPERATOR(+, NUM_VALUE);
+			}
+
 			break;
 		}
-		case OP_BIN_SUB: {
+		case OP_SUB: {
 			BINARY_OPERATOR(-, NUM_VALUE);
 			break;
 		}
-		case OP_BIN_MUL: {
+		case OP_MUL: {
 			BINARY_OPERATOR(*, NUM_VALUE);
 			break;
 		}
-		case OP_BIN_DIV: {
+		case OP_DIV: {
 			BINARY_OPERATOR(/, NUM_VALUE);
 			break;
 		}

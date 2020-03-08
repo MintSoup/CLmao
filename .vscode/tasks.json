@@ -15,6 +15,7 @@
                 "vm.c",
                 "compiler.c",
                 "scanner.c",
+                "object.c",
                 "-o",
                 "main.exe",
                 "&&",
@@ -42,6 +43,7 @@
                 "vm.c",
                 "compiler.c",
                 "scanner.c",
+                "object.c",
                 "-o",
                 "main.exe"
             ],
