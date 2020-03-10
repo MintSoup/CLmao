@@ -131,9 +131,8 @@ static TokenType identifierType() {
 			return checkKeyword(2, 2, "is", TOKEN_THIS);
 		}
 		break;
-	default: 
-		return TOKEN_IDENTIFIER;
 	}
+	return TOKEN_IDENTIFIER;
 }
 
 void initScanner(const char *src) {

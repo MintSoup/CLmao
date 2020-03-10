@@ -7,6 +7,7 @@
             "command": "gcc",
             "args": [
                 "-O3",
+                "-Wall",
                 "main.c",
                 "chunk.c",
                 "mem.c",
@@ -36,6 +37,7 @@
                 "-g",
                 "-Og",
                 "-DDEBUG_BUILD",
+                "-Wall",
                 "main.c",
                 "chunk.c",
                 "mem.c",

@@ -2,8 +2,8 @@
 #include "commons.h"
 #include "dbg.h"
 #include "object.h"
-#include <stdio.h>
 #include "value.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -75,6 +75,7 @@ static bool consume(TokenType type, char *msg) {
 		return true;
 	}
 	errorAtCurrent(msg);
+	return false;
 }
 
 static Chunk *currentChunk() { return compilingChunk; }
@@ -160,6 +161,7 @@ static void binary(bool canAssign) {
 	case TOKEN_BANG_EQUAL:
 		emitByte(OP_NOT_EQUALS);
 		break;
+	default:;
 	}
 }
 
@@ -174,6 +176,7 @@ static void literal(bool canAssign) {
 	case TOKEN_TRUE:
 		emitByte(OP_TRUE);
 		return;
+	default:;
 	}
 }
 

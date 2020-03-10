@@ -52,5 +52,7 @@ bool equal(Value a, Value b) {
 		return AS_NUM(a) == AS_NUM(b);
 	case VAL_OBJ:
 		return AS_OBJ(a) == AS_OBJ(b);
+	default:
+		return false;
 	}
 }

@@ -11,6 +11,11 @@
 
 VM vm;
 
+static void resetStack();
+static Value peek(int distance);
+static void runtimeError(const char *format, ...);
+
+
 void initVM() {
 	resetStack();
 	vm.objects = NULL;
@@ -32,7 +37,10 @@ static bool isTruthy(Value v) {
 		return true;
 	case VAL_NULL:
 		return false;
+	case VAL_OBJ:
+		return true;
 	}
+	return false;
 }
 
 static void concat() {

@@ -103,7 +103,7 @@ bool tableRemove(Table *t, ObjString *key) {
 		if (entry->key == NULL)
 			return false;
 		if (entry->key == key) {
-			entry->key == NULL;
+			entry->key = NULL;
 			entry->value = BOOL_VALUE(true);
 			return true;
 		}

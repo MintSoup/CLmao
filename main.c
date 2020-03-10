@@ -36,7 +36,7 @@ char *readFile(char *name) {
 	rewind(f);
 	char *buf = (char *)malloc(size + 1);
 	if (buf == NULL) {
-		fprintf(stderr, "Not enough memory to read file\n", name);
+		fprintf(stderr, "Not enough memory to read file:\n");
 		exit(1);
 	}
 	size_t bytesRead = fread(buf, sizeof(char), size, f);
