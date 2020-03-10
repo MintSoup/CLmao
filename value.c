@@ -51,6 +51,6 @@ bool equal(Value a, Value b) {
 	case VAL_NUM:
 		return AS_NUM(a) == AS_NUM(b);
 	case VAL_OBJ:
-		return strcmp(AS_CSTRING(a), AS_CSTRING(b)) == 0;
+		return AS_OBJ(a) == AS_OBJ(b);
 	}
 }

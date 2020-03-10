@@ -16,6 +16,7 @@
                 "compiler.c",
                 "scanner.c",
                 "object.c",
+                "table.c",
                 "-o",
                 "main.exe",
                 "&&",
@@ -44,6 +45,7 @@
                 "compiler.c",
                 "scanner.c",
                 "object.c",
+                "table.c",
                 "-o",
                 "main.exe"
             ],

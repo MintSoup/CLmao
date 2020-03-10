@@ -10,7 +10,6 @@ typedef struct {
 
 Scanner scanner;
 
-
 static bool isAtEnd() { return *scanner.current == 0; }
 
 static Token makeToken(TokenType type) {
@@ -132,12 +131,10 @@ static TokenType identifierType() {
 			return checkKeyword(2, 2, "is", TOKEN_THIS);
 		}
 		break;
+	default: 
+		return TOKEN_IDENTIFIER;
 	}
 }
-
-
-
-
 
 void initScanner(const char *src) {
 	scanner.start = src;
@@ -199,7 +196,8 @@ Token scanToken() {
 			while (isAlphaNumeric(peek()))
 				advance();
 
-			return makeToken(identifierType());
+			TokenType type = identifierType();
+			return makeToken(type);
 
 		}
 
@@ -219,4 +217,3 @@ Token scanToken() {
 
 	return errorToken("Unexpected character");
 }
-

@@ -36,8 +36,7 @@ typedef struct {
 #define IS_BOOL(x) ((x).type == VAL_BOOL)
 #define IS_OBJ(x) ((x).type == VAL_OBJ)
 
-#define IS_INT(x)                                                              \
-	(IS_NUM(x) && fabs(round(AS_NUM(x)) - AS_NUM(x)) <= 0.0000001)
+#define IS_INT(x) (IS_NUM(x) && fabs(round(AS_NUM(x)) - AS_NUM(x)) <= 0.0000001)
 
 #define BOOL_VALUE(x) ((Value){VAL_BOOL, {.boolean = x}})
 #define NUM_VALUE(x) ((Value){VAL_NUM, {.number = x}})

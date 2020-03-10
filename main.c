@@ -62,4 +62,5 @@ void runFile(char *name) {
 	} else if (i == INTERPRET_RUNTIME_ERROR) {
 		exit(420);
 	}
+
 }

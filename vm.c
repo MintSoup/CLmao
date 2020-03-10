@@ -14,9 +14,15 @@ VM vm;
 void initVM() {
 	resetStack();
 	vm.objects = NULL;
+	initTable(&vm.strings);
+	initTable(&vm.globals);
 }
 
-void freeVM() { freeObjects(); }
+void freeVM() {
+	freeObjects();
+	freeTable(&vm.strings);
+	freeTable(&vm.globals);
+}
 
 static bool isTruthy(Value v) {
 	switch (v.type) {
@@ -47,6 +53,7 @@ static InterpretResult run() {
 
 #define READ_BYTE() (*(vm.ip++))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() (AS_STRING(READ_CONSTANT()))
 #define BINARY_OPERATOR(o, valueType)                                          \
 	do {                                                                       \
 		if (!(IS_NUM(peek(0)) && IS_NUM(peek(1)))) {                           \
@@ -170,11 +177,42 @@ static InterpretResult run() {
 			puts("");
 			break;
 		}
+		case OP_POP: {
+			pop();
+			break;
+		}
+		case OP_DEFINE_GLOBAL: {
+			ObjString *name = READ_STRING();
+			tableSet(&vm.globals, name, peek(0));
+			pop();
+			break;
+		}
+		case OP_GET_GLOBAL: {
+			ObjString *name = READ_STRING();
+			Value value;
+			if (!tableGet(&vm.globals, name, &value)) {
+				runtimeError("Variable %s not defined", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			push(value);
+			break;
+		}
+		case OP_SET_GLOBAL: {
+			ObjString *name = READ_STRING();
+			Value set = peek(0);
+			if (tableSet(&vm.globals, name, set)) {
+				tableRemove(&vm.globals, name);
+				runtimeError("Variable %s not defined", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			break;
+		}
 
 		default: {}
 		}
 #undef READ_CONSTANT
 #undef READ_BYTE
+#undef READ_STRING
 	}
 }
 

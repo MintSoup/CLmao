@@ -19,6 +19,7 @@ struct sObjString {
 	Obj obj;
 	int length;
 	char *chars;
+	uint32_t hash;
 };
 
 ObjString *copyString(const char *start, size_t length);
