@@ -215,6 +215,16 @@ static InterpretResult run() {
 			}
 			break;
 		}
+		case OP_SET_LOCAL:{
+			uint8_t level = READ_BYTE();
+			vm.stack[level] = peek(0);
+			break;
+		}
+		case OP_GET_LOCAL:{
+			uint8_t level = READ_BYTE();
+			push(vm.stack[level]);
+			break;
+		}
 
 		default: {}
 		}

@@ -14,6 +14,12 @@ int simpleInstruction(char *name, int offset) {
 	printf("%s\n", name);
 	return offset + 1;
 }
+static int byteInstruction(char *name, Chunk *chunk, int offset) {
+	uint8_t level = chunk->code[offset + 1];
+	printf("%-16s %4d\n", name, level);
+	return offset + 2;
+}
+
 static int constantInstruction(char *name, Chunk *chunk, int offset) {
 	uint8_t constant = chunk->code[offset + 1];
 	printf("%-16s %4d '", name, constant);
@@ -108,6 +114,12 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	}
 	case OP_SET_GLOBAL: {
 		return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+	}
+	case OP_GET_LOCAL: {
+		return byteInstruction("OP_GET_LOCAL", chunk, offset);
+	}
+	case OP_SET_LOCAL: {
+		return byteInstruction("OP_SET_LOCAL", chunk, offset);
 	}
 
 	default: {
