@@ -121,6 +121,9 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_SET_LOCAL: {
 		return byteInstruction("OP_SET_LOCAL", chunk, offset);
 	}
+	case OP_POPN: {
+		return constantInstruction("OP_POPN", chunk, offset);
+	}
 
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);

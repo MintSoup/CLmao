@@ -1,5 +1,6 @@
 let a = 3;
 {
-    let a = a;
+   let a;
+   let b;
 }
-
+print a;

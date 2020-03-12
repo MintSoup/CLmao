@@ -133,12 +133,17 @@ static void endCompiler() {
 static void beginScope() { current->scopeDepth++; }
 static void endScope() {
 	current->scopeDepth--;
+	uint8_t pops = 0;
 	while (current->localCount > 0 &&
 		   current->locals[current->localCount - 1].depth >
 			   current->scopeDepth) {
-		emitByte(OP_POP);
+		pops++;
 		current->localCount--;
 	}
+	if (pops == 1)
+		emitByte(OP_POP);
+	else if (pops > 1)
+		emitBytes(OP_POPN, pops);
 }
 
 static void expression();
@@ -235,7 +240,7 @@ static int resolveLocal(Compiler *compiler, Token *name) {
 	for (int i = compiler->localCount - 1; i >= 0; i--) {
 		Local *local = &compiler->locals[i];
 		if (identifiersEqual(name, &local->name)) {
-			if(local->depth == -1){
+			if (local->depth == -1) {
 				error("Cannot reference variable in its own initializer");
 			}
 			return i;

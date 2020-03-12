@@ -225,6 +225,13 @@ static InterpretResult run() {
 			push(vm.stack[level]);
 			break;
 		}
+		case OP_POPN:{
+			uint8_t count = READ_BYTE();
+			while(count--){
+				pop();
+			}
+			break;
+		}
 
 		default: {}
 		}
