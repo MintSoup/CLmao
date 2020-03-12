@@ -1,6 +1,5 @@
-let a = 3;
-{
-   let a;
-   let b;
+let i = 10;
+while(i){
+   print i;
+   i = i - 1;
 }
-print a;
