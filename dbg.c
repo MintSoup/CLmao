@@ -82,31 +82,24 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	}
 	case OP_EQUALS: {
 		return simpleInstruction("OP_EQUALS", offset);
-		break;
 	}
 	case OP_NOT_EQUALS: {
 		return simpleInstruction("OP_NOT_EQUALS", offset);
-		break;
 	}
 	case OP_GREATER: {
 		return simpleInstruction("OP_GREATER", offset);
-		break;
 	}
 	case OP_LESS: {
 		return simpleInstruction("OP_LESS", offset);
-		break;
 	}
 	case OP_GREATER_EQUAL: {
 		return simpleInstruction("OP_GREATER_EQUAL", offset);
-		break;
 	}
 	case OP_LESS_EQUAL: {
 		return simpleInstruction("OP_LESS_EQUAL", offset);
-		break;
 	}
 	case OP_FACTORIAL: {
 		return simpleInstruction("OP_FACTORIAL", offset);
-		break;
 	}
 	case OP_POP: {
 		return simpleInstruction("OP_POP", offset);
@@ -137,6 +130,9 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	}
 	case OP_LOOP: {
 		return shortInstruction("OP_LOOP", chunk, offset);
+	}
+	case OP_MODULO: {
+		return simpleInstruction("OP_MODULO", offset);
 	}
 
 	default: {

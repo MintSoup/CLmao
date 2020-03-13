@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <time.h>
 VM vm;
 
 static void resetStack();
@@ -84,7 +84,7 @@ static InterpretResult run() {
 		}
 		printf("\n");
 
-		disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+		disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code - 1));
 #endif
 
 		switch (instruction) {
@@ -246,6 +246,25 @@ static InterpretResult run() {
 			vm.ip -= offset;
 			break;
 		}
+		case OP_MODULO: {
+			Value a = peek(0);
+			Value b = peek(1);
+			if (IS_INT(a) && (round(AS_NUM(a)) >= 1)) {
+				if (IS_INT(b) && (round(AS_NUM(b)) >= 0)) {
+					int right = round(AS_NUM(pop()));
+					int left = round(AS_NUM(pop()));
+					push(NUM_VALUE((double)(left % right)));
+				} else {
+					runtimeError("Modulo supported only on positive ints.");
+					return INTERPRET_RUNTIME_ERROR;
+				}
+			} else {
+				runtimeError("Modulo supported only on positive ints.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			break;
+		}
 
 		default: {}
 		}
@@ -259,15 +278,32 @@ static InterpretResult run() {
 InterpretResult interpret(const char *src) {
 	Chunk chunk;
 	initChunk(&chunk);
+#ifdef DEBUG_CLOCKS
 
+	clock_t start;
+	clock_t end;
+	start = clock();
+#endif
 	if (!compile(src, &chunk)) {
 		freeChunk(&chunk);
 		return INTERPRET_COMPILE_ERROR;
 	}
+#ifdef DEBUG_CLOCKS
+
+	end = clock();
+	printf("\nCompiling took %ld ms.\n", end - start);
+#endif
 	vm.chunk = &chunk;
 	vm.ip = vm.chunk->code;
 
+#ifdef DEBUG_CLOCKS
+	start = clock();
+#endif
 	InterpretResult res = run();
+#ifdef DEBUG_CLOCKS
+	end = clock();
+	printf("\nRunning took %ld ms.\n", end - start);
+#endif
 	freeChunk(&chunk);
 
 	return res;

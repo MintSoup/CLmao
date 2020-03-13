@@ -222,6 +222,10 @@ static void binary(bool canAssign) {
 	case TOKEN_BANG_EQUAL:
 		emitByte(OP_NOT_EQUALS);
 		break;
+	case TOKEN_MODULO:{
+		emitByte(OP_MODULO);
+		break;
+	}
 	default:;
 	}
 }
@@ -343,6 +347,7 @@ ParseRule rules[] = {
 	{NULL, NULL, PREC_NONE},		 // TOKEN_SEMICOLON
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_SLASH
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_STAR
+	{NULL, binary, PREC_FACTOR},	 // TOKEN_MODULO
 	{unary, factorial, PREC_UNARY},  // TOKEN_BANG
 	{NULL, binary, PREC_EQUALITY},   // TOKEN_BANG_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_EQUAL
@@ -355,6 +360,7 @@ ParseRule rules[] = {
 	{string, NULL, PREC_NONE},		 // TOKEN_STRING
 	{number, NULL, PREC_NONE},		 // TOKEN_NUMBER
 	{NULL, and_, PREC_AND},			 // TOKEN_AND
+	{NULL, NULL, PREC_NONE},		 // TOKEN_BREAK
 	{NULL, NULL, PREC_NONE},		 // TOKEN_CLASS
 	{NULL, NULL, PREC_NONE},		 // TOKEN_ELSE
 	{literal, NULL, PREC_NONE},		 // TOKEN_FALSE
@@ -442,6 +448,8 @@ static void statement() {
 		whileStatement();
 	} else if (match(TOKEN_FOR)) {
 		forStatement();
+	} else if (match(TOKEN_BREAK)) {
+		// TODO: Handle breaks
 	} else {
 		expressionStatement();
 	}
@@ -484,7 +492,7 @@ static void ifStatement() {
 }
 static void whileStatement() {
 	beginScope();
-	
+
 	int loop = currentChunk()->count;
 	consume(TOKEN_LEFT_PAREN, "Expected '(' after while statement");
 	expression();

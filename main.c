@@ -8,7 +8,12 @@
 void runFile(char *name);
 char *readFile(char *name);
 
+char obuffer[8192];
+char ebuffer[8192];
 int main(int argc, char *argv[]) {
+	setvbuf(stdout, obuffer, _IOFBF, sizeof(obuffer));
+	setvbuf(stderr, ebuffer, _IOFBF, sizeof(ebuffer));
+
 	initVM();
 #ifndef DEBUG_BUILD
 
@@ -51,7 +56,6 @@ char *readFile(char *name) {
 void runFile(char *name) {
 	char *src = readFile(name);
 
-	
 	InterpretResult i = interpret(src);
 	free(src);
 
@@ -62,5 +66,4 @@ void runFile(char *name) {
 	} else if (i == INTERPRET_RUNTIME_ERROR) {
 		exit(420);
 	}
-
 }

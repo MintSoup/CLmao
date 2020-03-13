@@ -1,5 +1,7 @@
-let i = 10;
-while(i){
-   print i;
-   i = i - 1;
+let i = 0;
+let lastN = 2;
+while(i < 100){
+    for(let f = 2; f < lastN / 2; f = f + 1){
+        if(lastN % f == 0) print lastN;
+    }
 }

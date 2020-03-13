@@ -94,6 +94,8 @@ static TokenType identifierType() {
 	switch (scanner.start[0]) {
 	case 'a':
 		return checkKeyword(1, 2, "nd", TOKEN_AND);
+	case 'b':
+		return checkKeyword(1, 4, "reak", TOKEN_BREAK);
 	case 'c':
 		return checkKeyword(1, 4, "lass", TOKEN_CLASS);
 	case 'e':
@@ -179,6 +181,8 @@ Token scanToken() {
 		return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
 	case '>':
 		return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+	case '%':
+		return makeToken(TOKEN_MODULO);
 	case '"': {
 		while (!isAtEnd() && peek() != '"') {
 			if (peek() == '\n')
