@@ -1,7 +1,11 @@
-let i = 0;
-let lastN = 2;
-while(i < 100){
-    for(let f = 2; f < lastN / 2; f = f + 1){
-        if(lastN % f == 0) print lastN;
+for(let i = 1000000000;;i = i + 1){
+    let wasPrime = true;
+    for(let x = 2; x < i / 9000; x = x + 1){
+        if(i % x == 0){
+            wasPrime = false;
+            break;
+        }
     }
+    if(wasPrime) print i;
+    if(i == 1000000100) break;
 }

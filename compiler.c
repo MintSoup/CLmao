@@ -42,9 +42,16 @@ typedef struct {
 } Local;
 
 typedef struct {
+	int breaks[256];
+} Loop;
+
+typedef struct {
 	Local locals[UINT8_COUNT];
 	int localCount;
 	int scopeDepth;
+	int loopCount;
+	Loop loops[256];
+
 } Compiler;
 
 Parser parser;
@@ -118,6 +125,13 @@ static void emitLoop(int where) {
 
 static void emitReturn() { emitByte(OP_RETURN); }
 
+static void emitPop(uint8_t pops) {
+	if (pops == 1)
+		emitByte(OP_POP);
+	else if (pops > 1)
+		emitBytes(OP_POPN, pops);
+}
+
 uint8_t makeConstant(Value val) {
 	int c = addConstant(currentChunk(), val);
 	if (c >= UINT8_MAX) {
@@ -142,6 +156,7 @@ static void patchJump(int offset) {
 static void initCompiler(Compiler *compiler) {
 	compiler->localCount = 0;
 	compiler->scopeDepth = 0;
+	compiler->loopCount = 0;
 	current = compiler;
 }
 
@@ -154,7 +169,8 @@ static void endCompiler() {
 }
 
 static void beginScope() { current->scopeDepth++; }
-static void endScope() {
+
+static uint8_t endScope() {
 	current->scopeDepth--;
 	uint8_t pops = 0;
 	while (current->localCount > 0 &&
@@ -163,10 +179,8 @@ static void endScope() {
 		pops++;
 		current->localCount--;
 	}
-	if (pops == 1)
-		emitByte(OP_POP);
-	else if (pops > 1)
-		emitBytes(OP_POPN, pops);
+	emitPop(pops);
+	return pops;
 }
 
 static void expression();
@@ -181,6 +195,7 @@ static void varDeclaration();
 static void ifStatement();
 static void whileStatement();
 static void forStatement();
+static void breakStatement();
 static uint8_t identifierConstant(Token *token);
 
 static ParseRule *getRule(TokenType type);
@@ -222,7 +237,7 @@ static void binary(bool canAssign) {
 	case TOKEN_BANG_EQUAL:
 		emitByte(OP_NOT_EQUALS);
 		break;
-	case TOKEN_MODULO:{
+	case TOKEN_MODULO: {
 		emitByte(OP_MODULO);
 		break;
 	}
@@ -449,7 +464,7 @@ static void statement() {
 	} else if (match(TOKEN_FOR)) {
 		forStatement();
 	} else if (match(TOKEN_BREAK)) {
-		// TODO: Handle breaks
+		breakStatement();
 	} else {
 		expressionStatement();
 	}
@@ -491,20 +506,53 @@ static void ifStatement() {
 	patchJump(elseJump);
 }
 static void whileStatement() {
-	beginScope();
 
 	int loop = currentChunk()->count;
 	consume(TOKEN_LEFT_PAREN, "Expected '(' after while statement");
 	expression();
 	consume(TOKEN_RIGHT_PAREN, "Expected ')' after while condition");
 	int back = emitJump(OP_JUMP_IF_FALSE);
-	emitByte(OP_POP);
-	statement();
-	emitLoop(loop);
-	patchJump(back);
+
 	emitByte(OP_POP);
 
-	endScope();
+	Loop *ourLoop = &current->loops[current->loopCount++];
+	for (int i = 0; i < 256; i++)
+		ourLoop->breaks[i] = -1;
+
+	// statement();
+
+	int pops = -1;
+	if (match(TOKEN_LEFT_BRACE)) {
+		beginScope();
+		while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
+			declaration();
+		consume(TOKEN_RIGHT_BRACE, "Expected } after block statement");
+
+		pops = (int)endScope();
+	} else if (match(TOKEN_BREAK)) {
+		error("Break is the only statement in while loop.");
+	} else
+		statement();
+
+	emitLoop(loop); // loopback
+
+	patchJump(back);  // jump here if false
+	emitByte(OP_POP); // pop after jumping when false
+
+	int bjump = emitJump(OP_JUMP); // jump over break section
+
+	// break section
+	if (pops != -1) {
+		for (int i = 0; i < 256; i++) {
+			if (ourLoop->breaks[i] != -1) {
+				patchJump(ourLoop->breaks[i]);
+			}
+		}
+		emitPop((uint8_t)pops);
+	}
+	//----------
+	patchJump(bjump);
+	current->loopCount--;
 }
 
 static void forStatement() {
@@ -543,7 +591,25 @@ static void forStatement() {
 	if (bodyJump != -1)
 		patchJump(bodyJump);
 
-	statement();
+	Loop *ourLoop = &current->loops[current->loopCount++];
+	for (int i = 0; i < 256; i++)
+		ourLoop->breaks[i] = -1;
+
+	// statement();
+
+	int pops = -1;
+	if (match(TOKEN_LEFT_BRACE)) {
+		beginScope();
+		while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
+			declaration();
+		consume(TOKEN_RIGHT_BRACE, "Expected } after block statement");
+
+		pops = (int)endScope();
+	} else if (match(TOKEN_BREAK)) {
+		error("Break is the only statement in for loop.");
+	} else
+		statement();
+
 	if (incrementJump != -1) {
 		emitLoop(incrementJump);
 	} else {
@@ -552,6 +618,22 @@ static void forStatement() {
 
 	patchJump(back);
 	emitByte(OP_POP);
+
+	int bjump = emitJump(OP_JUMP); // jump over break section
+
+	// break section
+	if (pops != -1) {
+		for (int i = 0; i < 256; i++) {
+			if (ourLoop->breaks[i] != -1) {
+				patchJump(ourLoop->breaks[i]);
+			}
+		}
+		emitPop((uint8_t)pops);
+	}
+	//----------
+	patchJump(bjump);
+
+	current->loopCount--;
 	endScope();
 }
 
@@ -637,6 +719,20 @@ static void varDeclaration() {
 	consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration");
 
 	defineVariable(global);
+}
+
+static void breakStatement() {
+	consume(TOKEN_SEMICOLON, "Expected ';' after break.");
+	if (current->loopCount <= 0)
+		error("Using break outside loop.");
+
+	Loop *loop = &current->loops[current->loopCount - 1];
+	for (int i = 0; i < 256; i++) {
+		if (loop->breaks[i] == -1) {
+			loop->breaks[i] = emitJump(OP_JUMP);
+			break;
+		}
+	}
 }
 
 #undef check
