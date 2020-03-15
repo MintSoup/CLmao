@@ -123,7 +123,7 @@ static TokenType identifierType() {
 		case 'a':
 			return checkKeyword(2, 3, "lse", TOKEN_FALSE);
 		case 'u':
-			return checkKeyword(2, 3, "unc", TOKEN_FUNC);
+			return checkKeyword(2, 2, "nc", TOKEN_FUNC);
 		}
 	case 't':
 		switch (scanner.start[1]) {

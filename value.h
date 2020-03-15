@@ -28,8 +28,7 @@ typedef struct {
 #define AS_BOOL(x) ((x).as.boolean)
 #define AS_NUM(x) ((x).as.number)
 #define AS_OBJ(x) ((x).as.obj)
-#define AS_STRING(x) ((ObjString *)AS_OBJ(x))
-#define AS_CSTRING(x) (AS_STRING(x)->chars)
+
 
 #define IS_NULL(x) ((x).type == VAL_NULL)
 #define IS_NUM(x) ((x).type == VAL_NUM)

@@ -11,15 +11,23 @@
 #include <time.h>
 VM vm;
 
+static Value clockNative(int argCount, Value *args) {
+	return NUM_VALUE((double)clock());
+}
+
 static void resetStack();
 static Value peek(int distance);
 static void runtimeError(const char *format, ...);
+static bool callValue(Value callee, int args);
+static void defineNative(const char *name, NativeFn function);
 
 void initVM() {
 	resetStack();
 	vm.objects = NULL;
 	initTable(&vm.strings);
 	initTable(&vm.globals);
+
+	defineNative("clock", clockNative);
 }
 
 void freeVM() {
@@ -57,11 +65,13 @@ static void concat() {
 }
 
 static InterpretResult run() {
+	Callframe *frame = &(vm.frames[vm.frameCount - 1]);
 
-#define READ_BYTE() (*(vm.ip++))
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_BYTE() (*frame->ip++)
+#define READ_CONSTANT() (frame->func->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
-#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+#define READ_SHORT()                                                           \
+	(frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define BINARY_OPERATOR(o, valueType)                                          \
 	do {                                                                       \
 		if (!(IS_NUM(peek(0)) && IS_NUM(peek(1)))) {                           \
@@ -84,12 +94,22 @@ static InterpretResult run() {
 		}
 		printf("\n");
 
-		disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code - 1));
+		disassembleInstruction(&frame->function->chunk,
+							   (int)(frame->ip - frame->function->chunk.code));
 #endif
 
 		switch (instruction) {
 		case OP_RETURN: {
-			return INTERPRET_OK;
+			Value result = pop();
+			vm.frameCount--;
+			if (vm.frameCount == 0) {
+				pop();
+				return INTERPRET_OK;
+			}
+			vm.stackTop = frame->slots;
+			push(result);
+			frame = &vm.frames[vm.frameCount - 1];
+			break;
 		}
 		case OP_CONSTANT: {
 			Value constant = READ_CONSTANT();
@@ -217,12 +237,12 @@ static InterpretResult run() {
 		}
 		case OP_SET_LOCAL: {
 			uint8_t level = READ_BYTE();
-			vm.stack[level] = peek(0);
+			frame->slots[level] = peek(0);
 			break;
 		}
 		case OP_GET_LOCAL: {
 			uint8_t level = READ_BYTE();
-			push(vm.stack[level]);
+			push(frame->slots[level]);
 			break;
 		}
 		case OP_POPN: {
@@ -233,17 +253,17 @@ static InterpretResult run() {
 		case OP_JUMP_IF_FALSE: {
 			uint16_t offset = READ_SHORT();
 			if (!isTruthy(peek(0)))
-				vm.ip += offset;
+				frame->ip += offset;
 			break;
 		}
 		case OP_JUMP: {
 			uint16_t offset = READ_SHORT();
-			vm.ip += offset;
+			frame->ip += offset;
 			break;
 		}
 		case OP_LOOP: {
 			uint16_t offset = READ_SHORT();
-			vm.ip -= offset;
+			frame->ip -= offset;
 			break;
 		}
 		case OP_MODULO: {
@@ -265,6 +285,14 @@ static InterpretResult run() {
 
 			break;
 		}
+		case OP_CALL: {
+			int args = READ_BYTE();
+			if (!callValue(peek(args), args)) {
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			frame = &vm.frames[vm.frameCount - 1];
+			break;
+		}
 
 		default: {}
 		}
@@ -276,25 +304,27 @@ static InterpretResult run() {
 }
 
 InterpretResult interpret(const char *src) {
-	Chunk chunk;
-	initChunk(&chunk);
 #ifdef DEBUG_CLOCKS
 
 	clock_t start;
 	clock_t end;
 	start = clock();
-#endif
-	if (!compile(src, &chunk)) {
-		freeChunk(&chunk);
-		return INTERPRET_COMPILE_ERROR;
-	}
-#ifdef DEBUG_CLOCKS
 
+#endif
+
+	ObjFunction *script = compile(src);
+
+#ifdef DEBUG_CLOCKS
 	end = clock();
 	printf("\nCompiling took %ld ms.\n", end - start);
 #endif
-	vm.chunk = &chunk;
-	vm.ip = vm.chunk->code;
+
+	if (script == NULL)
+		return INTERPRET_COMPILE_ERROR;
+	else {
+		push(OBJ_VALUE((Obj *)script));
+		callValue(OBJ_VALUE((Obj *)script), 0);
+	}
 
 #ifdef DEBUG_CLOCKS
 	start = clock();
@@ -304,7 +334,6 @@ InterpretResult interpret(const char *src) {
 	end = clock();
 	printf("\nRunning took %ld ms.\n", end - start);
 #endif
-	freeChunk(&chunk);
 
 	return res;
 }
@@ -313,16 +342,69 @@ static void resetStack() { vm.stackTop = vm.stack; }
 static void runtimeError(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	size_t instruction = vm.ip - vm.chunk->code;
-	int line = vm.chunk->lines[instruction];
-	fprintf(stderr, "[line %d] ", line);
+	for (int i = vm.frameCount - 1; i >= 0; i--) {
+		Callframe *frame = &vm.frames[i];
+		ObjFunction *function = frame->func;
+
+		size_t instruction = frame->ip - function->chunk.code - 1;
+		fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+		if (function->name == NULL) {
+			fprintf(stderr, "<script>\n");
+		} else {
+			fprintf(stderr, "%s()\n", function->name->chars);
+		}
+	}
 	vfprintf(stderr, format, args);
 	va_end(args);
 	fputs("\n", stderr);
 	resetStack();
 }
-
+static void defineNative(const char *name, NativeFn function) {
+	push(OBJ_VALUE((Obj *)copyString(name, (int)strlen(name))));
+	push(OBJ_VALUE((Obj *)newNative(function)));
+	tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+	pop();
+	pop();
+}
 void push(Value val) { *(vm.stackTop++) = val; }
 Value pop() { return *(--vm.stackTop); }
 
 static Value peek(int distance) { return vm.stackTop[-1 - distance]; }
+static bool call(ObjFunction *function, int args) {
+	if (args != function->arity) {
+		runtimeError("Expected %d arguments in function call, but got %d.",
+					 function->arity, args);
+		return false;
+	}
+	if (vm.frameCount == FRAMES_MAX)
+		runtimeError("Stack overflow.");
+	Callframe *frame = &vm.frames[vm.frameCount++];
+	frame->func = function;
+	frame->ip = function->chunk.code;
+
+	frame->slots = vm.stackTop - args - 1;
+	return true;
+}
+
+static bool callValue(Value callee, int args) {
+	if (IS_OBJ(callee)) {
+		switch (AS_OBJ(callee)->type) {
+		case OBJ_FUNCTION: {
+			return call(AS_FUNCTION(callee), args);
+		}
+		case OBJ_NATIVE: {
+			NativeFn native = AS_NATIVE(callee)->f;
+			Value result = native(args, vm.stackTop - args);
+			vm.stackTop -= args + 1;
+			push(result);
+			return true;
+		}
+
+		default:
+			break;
+		}
+	}
+
+	runtimeError("Only classes and functions are callable");
+	return false;
+}

@@ -134,6 +134,9 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_MODULO: {
 		return simpleInstruction("OP_MODULO", offset);
 	}
+	case OP_CALL: {
+		return byteInstruction("OP_CALL", chunk, offset);
+	}
 
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);

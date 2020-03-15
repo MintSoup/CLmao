@@ -5,14 +5,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define OUT_BUF_SIZE 8192
+
 void runFile(char *name);
 char *readFile(char *name);
 
-char obuffer[8192];
-char ebuffer[8192];
+char obuffer[OUT_BUF_SIZE];
+char ebuffer[OUT_BUF_SIZE];
 int main(int argc, char *argv[]) {
-	setvbuf(stdout, obuffer, _IOFBF, sizeof(obuffer));
-	setvbuf(stderr, ebuffer, _IOFBF, sizeof(ebuffer));
+	// setvbuf(stdout, obuffer, _IOFBF, sizeof(obuffer));
+	// setvbuf(stderr, ebuffer, _IOFBF, sizeof(ebuffer));
 
 	initVM();
 #ifndef DEBUG_BUILD
