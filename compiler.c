@@ -19,7 +19,7 @@ typedef enum {
 	PREC_ASSIGNMENT, // =
 	PREC_OR,		 // or
 	PREC_AND,		 // and
-	PREC_EQUALITY,   // == !=
+	PREC_EQUALITY,	 // == !=
 	PREC_COMPARISON, // < > <= >=
 	PREC_TERM,		 // + -
 	PREC_FACTOR,	 // *
@@ -47,6 +47,11 @@ typedef struct {
 	int breaks[256];
 } Loop;
 
+typedef struct {
+	uint8_t index;
+	bool isLocal;
+} Upvalue;
+
 typedef struct Compiler {
 	struct Compiler *parent;
 	ObjFunction *function;
@@ -56,6 +61,7 @@ typedef struct Compiler {
 	int scopeDepth;
 	int loopCount;
 	Loop loops[256];
+	Upvalue upvalues[UINT8_COUNT];
 } Compiler;
 
 Parser parser;
@@ -356,12 +362,49 @@ static int resolveLocal(Compiler *compiler, Token *name) {
 	return -1;
 }
 
+static int addUpvalue(Compiler *compiler, uint8_t index, bool isLocal) {
+	int *upvalueCount = &compiler->function->upvalueCount;
+
+	for (int i = 0; i < *upvalueCount; i++) {
+		Upvalue *up = &compiler->upvalues[i];
+		if (up->index == index && up->isLocal == isLocal)
+			return i;
+	}
+
+	if (*upvalueCount >= UINT8_COUNT) {
+		error("Too many upvalues in one function closure");
+		return 0;
+	}
+
+	compiler->upvalues[*upvalueCount].index = index;
+	compiler->upvalues[*upvalueCount].isLocal = isLocal;
+	return (*upvalueCount)++;
+}
+
+static int resolveUpvalue(Compiler *compiler, Token *name) {
+	if (compiler->parent == NULL)
+		return -1;
+
+	int local = resolveLocal(compiler->parent, name);
+	if (local != -1)
+		return addUpvalue(compiler, (uint8_t)local, true);
+
+	local = resolveUpvalue(compiler->parent, name);
+	if (local != -1)
+		return addUpvalue(compiler, (uint8_t)local, false);
+
+	return -1;
+}
+
 static void namedVariable(Token t, bool canAssign) {
 	uint8_t getOp, setOp;
 	int arg = resolveLocal(current, &t);
 	if (arg != -1) {
 		getOp = OP_GET_LOCAL;
 		setOp = OP_SET_LOCAL;
+	} else if ((arg = resolveUpvalue(current, &t)) != -1) {
+		getOp = OP_GET_UPV;
+		setOp = OP_SET_UPV;
 	} else {
 		arg = identifierConstant(&t);
 		getOp = OP_GET_GLOBAL;
@@ -409,10 +452,10 @@ ParseRule rules[] = {
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_SLASH
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_STAR
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_MODULO
-	{unary, factorial, PREC_UNARY},  // TOKEN_BANG
-	{NULL, binary, PREC_EQUALITY},   // TOKEN_BANG_EQUAL
+	{unary, factorial, PREC_UNARY},	 // TOKEN_BANG
+	{NULL, binary, PREC_EQUALITY},	 // TOKEN_BANG_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_EQUAL
-	{NULL, binary, PREC_EQUALITY},   // TOKEN_EQUAL_EQUAL
+	{NULL, binary, PREC_EQUALITY},	 // TOKEN_EQUAL_EQUAL
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_GREATER
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_GREATER_EQUAL
 	{NULL, binary, PREC_COMPARISON}, // TOKEN_LESS
@@ -809,7 +852,11 @@ static void function(FunctionType type) {
 	block();
 
 	ObjFunction *func = endCompiler();
-	emitConstant(OBJ_VALUE((Obj *)func));
+	emitBytes(OP_CLOSURE, makeConstant(OBJ_VALUE((Obj *)func)));
+	for (int i = 0; i < func->upvalueCount; i++) {
+		emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+		emitByte(compiler.upvalues[i].index);
+	}
 }
 
 static void funcDeclaration() {

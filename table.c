@@ -49,10 +49,8 @@ static void adjustCapacity(Table *t, int capacity) {
 		if (entry->key == NULL)
 			continue;
 		Entry *dest = findEntry(entries, capacity, entry->key);
-		if (!IS_NULL(dest->value)) {
-			*dest = *entry;
-			t->count++;
-		}
+		*dest = *entry;
+		t->count++;
 	}
 	FREE_ARRAY(Entry, t->entries, t->capacity);
 	t->entries = entries;

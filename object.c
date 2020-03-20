@@ -80,6 +80,14 @@ void printObject(Value val) {
 		printf("<native>");
 		break;
 	}
+	case OBJ_CLOSURE: {
+		printFunction(AS_CLOSURE(val)->func);
+		break;
+	}
+	case OBJ_UPV: {
+		puts("upvalue");
+		break;
+	}
 	default:
 		break;
 	}
@@ -89,6 +97,7 @@ ObjFunction *newFunction(NativeFn func) {
 	ObjFunction *e = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 	e->arity = 0;
 	e->name = NULL;
+	e->upvalueCount = 0;
 	initChunk(&(e->chunk));
 	return e;
 }
@@ -96,4 +105,21 @@ ObjNative *newNative(NativeFn func) {
 	ObjNative *nat = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
 	nat->f = func;
 	return nat;
+}
+ObjClosure *newClosure(ObjFunction *func) {
+	ObjClosure *cls = (ObjClosure *)ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+	cls->func = func;
+
+	ObjUpvalue **upvalues = ALLOCATE_OBJ(ObjUpvalue *, OBJ_UPV);
+	for (int i = 0; i < func->upvalueCount; i++) {
+		upvalues[i] = NULL;
+	}
+	cls->upvalues = upvalues;
+	cls->upvalueCount = func->upvalueCount;
+	return cls;
+}
+ObjUpvalue *newUpvalue(Value *slot) {
+	ObjUpvalue *upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPV);
+	upvalue->location = slot;
+	return upvalue;
 }

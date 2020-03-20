@@ -1,5 +1,6 @@
 #include "dbg.h"
 #include "chunk.h"
+#include "object.h"
 #include "value.h"
 #include <stdio.h>
 
@@ -54,16 +55,16 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 		return simpleInstruction("OP_NEGATE", offset);
 	}
 	case OP_ADD: {
-		return simpleInstruction("OP_BIN_ADD", offset);
+		return simpleInstruction("OP_ADD", offset);
 	}
 	case OP_SUB: {
-		return simpleInstruction("OP_BIN_SUB", offset);
+		return simpleInstruction("OP_SUB", offset);
 	}
 	case OP_MUL: {
-		return simpleInstruction("OP_BIN_MUL", offset);
+		return simpleInstruction("OP_MUL", offset);
 	}
 	case OP_DIV: {
-		return simpleInstruction("OP_BIN_DIV", offset);
+		return simpleInstruction("OP_DIV", offset);
 	}
 	case OP_FALSE: {
 		return simpleInstruction("OP_FALSE", offset);
@@ -137,6 +138,25 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_CALL: {
 		return byteInstruction("OP_CALL", chunk, offset);
 	}
+	case OP_CLOSURE: {
+		offset++;
+		uint8_t constant = chunk->code[offset++];
+		printf("%-16s %4d ", "OP_CLOSURE", constant);
+		printValue(chunk->constants.values[constant]);
+		puts("");
+		ObjFunction *func = AS_FUNCTION(chunk->constants.values[constant]);
+		for (int j = 0; j < func->upvalueCount; j++) {
+			int isLocal = chunk->code[offset++];
+			int index = chunk->code[offset++];
+			printf("%04d      |                     %s %d\n", offset - 2,
+				   isLocal ? "local" : "upvalue", index);
+		}
+		return offset;
+	}
+	case OP_GET_UPV:
+		return byteInstruction("OP_GET_UPVALUE", chunk, offset);
+	case OP_SET_UPV:
+		return byteInstruction("OP_SET_UPVALUE", chunk, offset);
 
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);

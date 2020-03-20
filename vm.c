@@ -64,11 +64,17 @@ static void concat() {
 	push(OBJ_VALUE((Obj *)new));
 }
 
+static ObjUpvalue *captureUpvalue(Value *local) {
+	ObjUpvalue *createdUpvalue = newUpvalue(local);
+	return createdUpvalue;
+}
+
 static InterpretResult run() {
 	Callframe *frame = &(vm.frames[vm.frameCount - 1]);
 
 #define READ_BYTE() (*frame->ip++)
-#define READ_CONSTANT() (frame->func->chunk.constants.values[READ_BYTE()])
+#define READ_CONSTANT()                                                        \
+	(frame->closure->func->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 #define READ_SHORT()                                                           \
 	(frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -94,8 +100,9 @@ static InterpretResult run() {
 		}
 		printf("\n");
 
-		disassembleInstruction(&frame->function->chunk,
-							   (int)(frame->ip - frame->function->chunk.code));
+		disassembleInstruction(
+			&frame->closure->func->chunk,
+			(int)(frame->ip - frame->closure->func->chunk.code));
 #endif
 
 		switch (instruction) {
@@ -293,8 +300,36 @@ static InterpretResult run() {
 			frame = &vm.frames[vm.frameCount - 1];
 			break;
 		}
+		case OP_CLOSURE: {
+			ObjFunction *func = AS_FUNCTION(READ_CONSTANT());
+			ObjClosure *closure = newClosure(func);
+			push(OBJ_VALUE((Obj *)closure));
+			for (int i = 0; i < closure->upvalueCount; i++) {
+				uint8_t isLocal = READ_BYTE();
+				uint8_t index = READ_BYTE();
+				if (isLocal) {
+					closure->upvalues[i] = captureUpvalue(frame->slots + index);
+				} else {
+					closure->upvalues[i] = frame->closure->upvalues[index];
+				}
+			}
+			break;
+		}
+		case OP_SET_UPV: {
+			uint8_t slot = READ_BYTE();
+			*frame->closure->upvalues[slot]->location = peek(0);
+			break;
+		}
+		case OP_GET_UPV: {
+			uint8_t slot = READ_BYTE();
+			push(*frame->closure->upvalues[slot]->location);
+			break;
+		}
 
-		default: {}
+		default: {
+			runtimeError("Cringe unknown instruction");
+			return INTERPRET_RUNTIME_ERROR;
+		}
 		}
 #undef READ_CONSTANT
 #undef READ_BYTE
@@ -321,10 +356,12 @@ InterpretResult interpret(const char *src) {
 
 	if (script == NULL)
 		return INTERPRET_COMPILE_ERROR;
-	else {
-		push(OBJ_VALUE((Obj *)script));
-		callValue(OBJ_VALUE((Obj *)script), 0);
-	}
+
+	push(OBJ_VALUE((Obj *)script));
+	ObjClosure *closure = newClosure(script);
+	pop();
+	push(OBJ_VALUE((Obj *)closure));
+	callValue(OBJ_VALUE((Obj *)closure), 0);
 
 #ifdef DEBUG_CLOCKS
 	start = clock();
@@ -344,7 +381,7 @@ static void runtimeError(const char *format, ...) {
 	va_start(args, format);
 	for (int i = vm.frameCount - 1; i >= 0; i--) {
 		Callframe *frame = &vm.frames[i];
-		ObjFunction *function = frame->func;
+		ObjFunction *function = frame->closure->func;
 
 		size_t instruction = frame->ip - function->chunk.code - 1;
 		fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
@@ -370,17 +407,17 @@ void push(Value val) { *(vm.stackTop++) = val; }
 Value pop() { return *(--vm.stackTop); }
 
 static Value peek(int distance) { return vm.stackTop[-1 - distance]; }
-static bool call(ObjFunction *function, int args) {
-	if (args != function->arity) {
+static bool call(ObjClosure *closure, int args) {
+	if (args != closure->func->arity) {
 		runtimeError("Expected %d arguments in function call, but got %d.",
-					 function->arity, args);
+					 closure->func->arity, args);
 		return false;
 	}
 	if (vm.frameCount == FRAMES_MAX)
 		runtimeError("Stack overflow.");
 	Callframe *frame = &vm.frames[vm.frameCount++];
-	frame->func = function;
-	frame->ip = function->chunk.code;
+	frame->closure = closure;
+	frame->ip = closure->func->chunk.code;
 
 	frame->slots = vm.stackTop - args - 1;
 	return true;
@@ -389,8 +426,8 @@ static bool call(ObjFunction *function, int args) {
 static bool callValue(Value callee, int args) {
 	if (IS_OBJ(callee)) {
 		switch (AS_OBJ(callee)->type) {
-		case OBJ_FUNCTION: {
-			return call(AS_FUNCTION(callee), args);
+		case OBJ_CLOSURE: {
+			return call(AS_CLOSURE(callee), args);
 		}
 		case OBJ_NATIVE: {
 			NativeFn native = AS_NATIVE(callee)->f;

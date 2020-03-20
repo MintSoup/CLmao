@@ -2,18 +2,18 @@
 #define VM_H
 
 #include "chunk.h"
-#include "value.h"
-#include "table.h"
-#include "object.h"
 #include "commons.h"
+#include "object.h"
+#include "table.h"
+#include "value.h"
 
 #define FRAMES_MAX 256
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef struct {
-	ObjFunction* func;
-	uint8_t* ip;
-	Value* slots;
+	ObjClosure *closure;
+	uint8_t *ip;
+	Value *slots;
 } Callframe;
 
 typedef struct {
