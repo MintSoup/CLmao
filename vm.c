@@ -65,8 +65,34 @@ static void concat() {
 }
 
 static ObjUpvalue *captureUpvalue(Value *local) {
+
+	ObjUpvalue *prevUpvalue = NULL;
+	ObjUpvalue *upvalue = vm.openUpvalues;
+
+	while (upvalue != NULL && upvalue->location > local) {
+		prevUpvalue = upvalue;
+		upvalue = upvalue->next;
+	}
+	if (upvalue != NULL && upvalue->location == local)
+		return upvalue;
 	ObjUpvalue *createdUpvalue = newUpvalue(local);
+	createdUpvalue->next = upvalue;
+	if (prevUpvalue == NULL) {
+		vm.openUpvalues = createdUpvalue;
+	} else {
+		prevUpvalue->next = createdUpvalue;
+	}
+
 	return createdUpvalue;
+}
+
+static void closeUpvalues(Value *last) {
+	while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
+		ObjUpvalue *upvalue = vm.openUpvalues;
+		upvalue->closed = *upvalue->location;
+		upvalue->location = &upvalue->closed;
+		vm.openUpvalues = upvalue->next;
+	}
 }
 
 static InterpretResult run() {
@@ -108,6 +134,7 @@ static InterpretResult run() {
 		switch (instruction) {
 		case OP_RETURN: {
 			Value result = pop();
+			closeUpvalues(frame->slots);
 			vm.frameCount--;
 			if (vm.frameCount == 0) {
 				pop();
@@ -325,7 +352,10 @@ static InterpretResult run() {
 			push(*frame->closure->upvalues[slot]->location);
 			break;
 		}
-
+		case OP_CLOSE_UPV:
+			closeUpvalues(vm.stackTop - 1);
+			pop();
+			break;
 		default: {
 			runtimeError("Cringe unknown instruction");
 			return INTERPRET_RUNTIME_ERROR;
@@ -375,7 +405,11 @@ InterpretResult interpret(const char *src) {
 	return res;
 }
 
-static void resetStack() { vm.stackTop = vm.stack; }
+static void resetStack() {
+	vm.stackTop = vm.stack;
+	vm.frameCount = 0;
+	vm.openUpvalues = NULL;
+}
 static void runtimeError(const char *format, ...) {
 	va_list args;
 	va_start(args, format);

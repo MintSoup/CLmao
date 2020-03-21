@@ -157,6 +157,8 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 		return byteInstruction("OP_GET_UPVALUE", chunk, offset);
 	case OP_SET_UPV:
 		return byteInstruction("OP_SET_UPVALUE", chunk, offset);
+	case OP_CLOSE_UPV:
+		return simpleInstruction("OP_CLOSE_UPV", offset);
 
 	default: {
 		printf("unknown upcode: 0x%x\n", instruction);

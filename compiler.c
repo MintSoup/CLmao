@@ -39,13 +39,19 @@ typedef struct {
 typedef struct {
 	Token name;
 	int depth;
+	bool isCaptured;
 } Local;
 
 typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
 
 typedef struct {
-	int breaks[256];
+	int breaks[UINT8_COUNT];
 } Loop;
+
+typedef struct {
+	uint8_t *begin;
+	int length;
+} ESReturn;
 
 typedef struct {
 	uint8_t index;
@@ -182,6 +188,7 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
 
 	Local *local = &current->locals[current->localCount++];
 	local->depth = 0;
+	local->isCaptured = false;
 	local->name.start = "";
 	local->name.length = 0;
 }
@@ -201,17 +208,26 @@ static ObjFunction *endCompiler() {
 
 static void beginScope() { current->scopeDepth++; }
 
-static uint8_t endScope() {
+static ESReturn endScope() {
 	current->scopeDepth--;
+	ESReturn e;
+	e.begin = current->function->chunk.code + current->function->chunk.count;
 	uint8_t pops = 0;
 	while (current->localCount > 0 &&
 		   current->locals[current->localCount - 1].depth >
 			   current->scopeDepth) {
-		pops++;
+		if (!current->locals[current->localCount - 1].isCaptured)
+			pops++;
+		else {
+			emitPop(pops);
+			emitByte(OP_CLOSE_UPV);
+			pops = 0;
+		}
 		current->localCount--;
 	}
 	emitPop(pops);
-	return pops;
+	e.length = &current->function->chunk.code[current->function->chunk.count] - e.begin;
+	return e;
 }
 
 static void expression();
@@ -386,9 +402,10 @@ static int resolveUpvalue(Compiler *compiler, Token *name) {
 		return -1;
 
 	int local = resolveLocal(compiler->parent, name);
-	if (local != -1)
+	if (local != -1) {
+		compiler->parent->locals[local].isCaptured = true;
 		return addUpvalue(compiler, (uint8_t)local, true);
-
+	}
 	local = resolveUpvalue(compiler->parent, name);
 	if (local != -1)
 		return addUpvalue(compiler, (uint8_t)local, false);
@@ -611,14 +628,15 @@ static void whileStatement() {
 
 	// statement();
 
-	int pops = -1;
+	ESReturn leave;
+	leave.length = -1;
 	if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();
 		while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
 			declaration();
 		consume(TOKEN_RIGHT_BRACE, "Expected } after block statement");
 
-		pops = (int)endScope();
+		leave = endScope();
 	} else if (match(TOKEN_BREAK)) {
 		error("Break is the only statement in while loop.");
 	} else
@@ -632,13 +650,17 @@ static void whileStatement() {
 	int bjump = emitJump(OP_JUMP); // jump over break section
 
 	// break section
-	if (pops != -1) {
+	if (leave.length != -1) {
 		for (int i = 0; i < 256; i++) {
 			if (ourLoop->breaks[i] != -1) {
 				patchJump(ourLoop->breaks[i]);
 			}
 		}
-		emitPop((uint8_t)pops);
+
+		for (int i = 0; i < leave.length; i++) {
+			emitByte(*(leave.begin + i));
+		}
+		
 	}
 	//----------
 	patchJump(bjump);
@@ -687,14 +709,15 @@ static void forStatement() {
 
 	// statement();
 
-	int pops = -1;
+	ESReturn leave;
+	leave.length = -1;
 	if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();
 		while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
 			declaration();
 		consume(TOKEN_RIGHT_BRACE, "Expected } after block statement");
 
-		pops = (int)endScope();
+		leave = endScope();
 	} else if (match(TOKEN_BREAK)) {
 		error("Break is the only statement in for loop.");
 	} else
@@ -712,13 +735,15 @@ static void forStatement() {
 	int bjump = emitJump(OP_JUMP); // jump over break section
 
 	// break section
-	if (pops != -1) {
+	if (leave.length != -1) {
 		for (int i = 0; i < 256; i++) {
 			if (ourLoop->breaks[i] != -1) {
 				patchJump(ourLoop->breaks[i]);
 			}
 		}
-		emitPop((uint8_t)pops);
+		for (int i = 0; i < leave.length; i++) {
+			emitByte(*(leave.begin + i));
+		}
 	}
 	//----------
 	patchJump(bjump);

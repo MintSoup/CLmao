@@ -58,16 +58,16 @@ struct sObjString {
 typedef struct sUpvalue {
 	Obj obj;
 	Value *location;
+	struct sUpvalue *next;
+	Value closed;
 } ObjUpvalue;
-
 
 typedef struct {
 	Obj obj;
 	ObjFunction *func;
-	ObjUpvalue** upvalues;
+	ObjUpvalue **upvalues;
 	int upvalueCount;
 } ObjClosure;
-
 
 ObjString *copyString(const char *start, size_t length);
 
