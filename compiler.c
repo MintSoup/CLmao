@@ -163,6 +163,8 @@ static void emitConstant(Value value) {
 	emitBytes(OP_CONSTANT, makeConstant(value));
 }
 
+
+
 static void patchJump(int offset) {
 	int jump = currentChunk()->count - offset - 2;
 	if (jump > UINT16_MAX)
@@ -226,7 +228,8 @@ static ESReturn endScope() {
 		current->localCount--;
 	}
 	emitPop(pops);
-	e.length = &current->function->chunk.code[current->function->chunk.count] - e.begin;
+	e.length = &current->function->chunk.code[current->function->chunk.count] -
+			   e.begin;
 	return e;
 }
 
@@ -245,6 +248,7 @@ static void forStatement();
 static void breakStatement();
 static void funcDeclaration();
 static void returnStatement();
+
 static uint8_t identifierConstant(Token *token);
 
 static ParseRule *getRule(TokenType type);
@@ -456,6 +460,12 @@ static void unary(bool canAssign) {
 	}
 }
 
+static void map(bool canAssign){
+	expression();
+	consume(TOKEN_RIGHT_BRACKET, "Expected closing ']' after map expression");
+	emitByte(OP_MAP);
+}
+
 ParseRule rules[] = {
 	{grouping, call, PREC_CALL},	 // TOKEN_LEFT_PAREN
 	{NULL, NULL, PREC_NONE},		 // TOKEN_RIGHT_PAREN
@@ -469,6 +479,8 @@ ParseRule rules[] = {
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_SLASH
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_STAR
 	{NULL, binary, PREC_FACTOR},	 // TOKEN_MODULO
+	{NULL, map, PREC_CALL},			 // TOKEN_LEFT_BRACKET
+	{NULL, NULL, PREC_NONE},		 // TOKEN_RIGHT_BRACKET
 	{unary, factorial, PREC_UNARY},	 // TOKEN_BANG
 	{NULL, binary, PREC_EQUALITY},	 // TOKEN_BANG_EQUAL
 	{NULL, NULL, PREC_NONE},		 // TOKEN_EQUAL
@@ -660,7 +672,6 @@ static void whileStatement() {
 		for (int i = 0; i < leave.length; i++) {
 			emitByte(*(leave.begin + i));
 		}
-		
 	}
 	//----------
 	patchJump(bjump);

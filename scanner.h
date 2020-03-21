@@ -17,6 +17,8 @@ typedef enum {
 	TOKEN_SLASH,
 	TOKEN_STAR,
 	TOKEN_MODULO,
+	TOKEN_LEFT_BRACKET,
+	TOKEN_RIGHT_BRACKET,
 
 	// One or two character tokens.
 	TOKEN_BANG,

@@ -38,7 +38,8 @@ typedef enum {
 	OP_CLOSURE,
 	OP_SET_UPV,
 	OP_GET_UPV,
-	OP_CLOSE_UPV
+	OP_CLOSE_UPV,
+	OP_MAP
 } OpCode;
 
 typedef struct {

@@ -25,6 +25,7 @@ typedef struct {
 	Table strings;
 	Table globals;
 	ObjUpvalue* openUpvalues;
+	bool nativeError;
 } VM;
 
 extern VM vm;

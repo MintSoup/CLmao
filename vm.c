@@ -11,23 +11,74 @@
 #include <time.h>
 VM vm;
 
-static Value clockNative(int argCount, Value *args) {
-	return NUM_VALUE((double)clock());
-}
-
 static void resetStack();
 static Value peek(int distance);
 static void runtimeError(const char *format, ...);
 static bool callValue(Value callee, int args);
 static void defineNative(const char *name, NativeFn function);
 
+static Value clockNative(int argCount, Value *args) {
+	if (argCount != 0) {
+		runtimeError("Builtin clock() function takes no arguments.");
+		vm.nativeError = true;
+	}
+	return NUM_VALUE((double)clock());
+}
+
+static Value slenNative(int argCount, Value *args) {
+	if (argCount != 1 || !IS_STRING(*args)) {
+		runtimeError("Builtin slen function takes 1 string argument.");
+		vm.nativeError = true;
+	}
+	return NUM_VALUE((double)AS_STRING(*args)->length);
+}
+static Value strNative(int argCount, Value *args) {
+	if (argCount != 1) {
+		runtimeError("Builtin slen function takes 1.");
+		vm.nativeError = true;
+	}
+	ObjString *r;
+	switch (args->type) {
+	case VAL_BOOL: {
+		r = copyString(AS_BOOL(*args) ? "true" : "false",
+					   AS_BOOL(*args) ? 4 : 5);
+		break;
+	}
+	case VAL_NULL: {
+		r = copyString("null", 4);
+		break;
+	}
+	case VAL_NUM: {
+		if (IS_INT(*args)) {
+			char otp[15];
+			int len = sprintf(otp, "%d", (int)round(AS_NUM(*args)));
+			r = copyString(otp, len);
+			break;
+		}
+		char otp[20];
+		int len = sprintf(otp, "%g", AS_NUM(*args));
+		r = copyString(otp, len);
+		break;
+	}
+	default: {
+		runtimeError("Cannot stringify objects.");
+		vm.nativeError = true;
+		r = copyString("", 0);
+	}
+	}
+	return OBJ_VALUE((Obj *)r);
+}
+
 void initVM() {
 	resetStack();
 	vm.objects = NULL;
 	initTable(&vm.strings);
 	initTable(&vm.globals);
+	vm.nativeError = false;
 
 	defineNative("clock", clockNative);
+	defineNative("slen", slenNative);
+	defineNative("str", strNative);
 }
 
 void freeVM() {
@@ -356,6 +407,25 @@ static InterpretResult run() {
 			closeUpvalues(vm.stackTop - 1);
 			pop();
 			break;
+		case OP_MAP:
+			if (!(IS_INT(peek(0)) && round(AS_NUM(peek(0))) >= 0)) {
+				runtimeError("Map index can only be positive integer.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			int index = (int)round(AS_NUM(pop()));
+			if (!IS_STRING(peek(0))) {
+				runtimeError("Only strings are maps.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			ObjString *str = (ObjString *)AS_OBJ(pop());
+			if (index >= str->length) {
+				runtimeError("Map index is too large. (%d / %d).", index,
+							 str->length);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			ObjString *nstr = copyString(str->chars + index, 1);
+			push(OBJ_VALUE((Obj *)nstr));
+			break;
 		default: {
 			runtimeError("Cringe unknown instruction");
 			return INTERPRET_RUNTIME_ERROR;
@@ -466,6 +536,8 @@ static bool callValue(Value callee, int args) {
 		case OBJ_NATIVE: {
 			NativeFn native = AS_NATIVE(callee)->f;
 			Value result = native(args, vm.stackTop - args);
+			if (vm.nativeError)
+				return false;
 			vm.stackTop -= args + 1;
 			push(result);
 			return true;
