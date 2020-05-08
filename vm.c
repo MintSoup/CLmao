@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 VM vm;
 
 static void resetStack();
@@ -17,6 +18,16 @@ static void runtimeError(const char *format, ...);
 static bool callValue(Value callee, int args);
 static void defineNative(const char *name, NativeFn function);
 
+#ifdef DEBUG_EXPOSEGC
+static Value gcNative(int argCount, Value *args) {
+	if (argCount != 0) {
+		runtimeError("Builtin gc() function takes no arguments.");
+		vm.nativeError = true;
+	}
+	gc();
+	return NULL_VALUE;
+}
+#endif
 static Value clockNative(int argCount, Value *args) {
 	if (argCount != 0) {
 		runtimeError("Builtin clock() function takes no arguments.");
@@ -74,17 +85,29 @@ void initVM() {
 	vm.objects = NULL;
 	initTable(&vm.strings);
 	initTable(&vm.globals);
+
+	vm.greyStack = NULL;
+	vm.greyCount = 0;
+	vm.greyCapacity = 0;
+
+	vm.bytesAllocated = 0;
+	vm.nextGC = 1024 * 1024;
+
 	vm.nativeError = false;
 
 	defineNative("clock", clockNative);
 	defineNative("slen", slenNative);
 	defineNative("str", strNative);
+#ifdef DEBUG_EXPOSEGC
+	defineNative("gc", gcNative);
+#endif
 }
 
 void freeVM() {
 	freeObjects();
 	freeTable(&vm.strings);
 	freeTable(&vm.globals);
+	free(vm.greyStack);
 }
 
 static bool isTruthy(Value v) {
@@ -102,8 +125,8 @@ static bool isTruthy(Value v) {
 }
 
 static void concat() {
-	ObjString *str2 = AS_STRING(pop());
-	ObjString *str1 = AS_STRING(pop());
+	ObjString *str2 = AS_STRING(peek(0));
+	ObjString *str1 = AS_STRING(peek(1));
 
 	size_t len = str1->length + str2->length;
 	char *newStr = ALLOCATE(char, len + 1);
@@ -112,6 +135,8 @@ static void concat() {
 	memcpy(newStr + str1->length, str2->chars, str2->length + 1);
 
 	ObjString *new = takeString(newStr, len);
+	pop();
+	pop();
 	push(OBJ_VALUE((Obj *)new));
 }
 
@@ -175,7 +200,7 @@ static InterpretResult run() {
 			printValue(*slot);
 			printf(" ]");
 		}
-		printf("\n");
+		puts("");
 
 		disassembleInstruction(
 			&frame->closure->func->chunk,

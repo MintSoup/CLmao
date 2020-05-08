@@ -8,6 +8,7 @@
             "args": [
                 "-O3",
                 "-Wall",
+                "-std=c99",
                 "main.c",
                 "chunk.c",
                 "mem.c",
@@ -38,6 +39,7 @@
                 "-Og",
                 "-DDEBUG_BUILD",
                 "-Wall",
+                "-std=c99",
                 "main.c",
                 "chunk.c",
                 "mem.c",

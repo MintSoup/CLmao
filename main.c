@@ -13,8 +13,8 @@ char *readFile(char *name);
 char obuffer[OUT_BUF_SIZE];
 char ebuffer[OUT_BUF_SIZE];
 int main(int argc, char *argv[]) {
-	// setvbuf(stdout, obuffer, _IOFBF, sizeof(obuffer));
-	// setvbuf(stderr, ebuffer, _IOFBF, sizeof(ebuffer));
+	setvbuf(stdout, obuffer, _IOFBF, sizeof(obuffer));
+	setvbuf(stderr, ebuffer, _IOFBF, sizeof(ebuffer));
 
 	initVM();
 #ifndef DEBUG_BUILD
@@ -66,6 +66,6 @@ void runFile(char *name) {
 	} else if (i == INTERPRET_COMPILE_ERROR) {
 		exit(69);
 	} else if (i == INTERPRET_RUNTIME_ERROR) {
-		exit(420);
+		exit(52);
 	}
 }

@@ -7,5 +7,6 @@
 #include "vm.h"
 
 ObjFunction *compile(const char *src);
+void markCompilerRoots();
 
 #endif

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mem.h"
 
 typedef struct {
 	Token previous;
@@ -912,6 +913,16 @@ static void returnStatement() {
 		expression();
 		consume(TOKEN_SEMICOLON, "Expected ';' after return.");
 		emitByte(OP_RETURN);
+	}
+}
+
+
+void markCompilerRoots(){
+	Compiler* c = current;
+
+	while(c != NULL){
+		markObject((Obj*) c->function);
+		c = c->parent;
 	}
 }
 

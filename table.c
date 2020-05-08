@@ -95,19 +95,25 @@ bool tableGet(Table *t, ObjString *key, Value *value) {
 }
 
 bool tableRemove(Table *t, ObjString *key) {
-	int index = key->hash % t->capacity;
-	Entry *entry = &t->entries[index];
-	while (true) {
-		if (entry->key == NULL)
-			return false;
-		if (entry->key == key) {
-			entry->key = NULL;
-			entry->value = BOOL_VALUE(true);
-			return true;
+	if (t->count == 0)
+		return false;
+	Entry *entry = findEntry(t->entries, t->capacity, key);
+	if (entry->key == NULL)
+		return false;
+
+	entry->key = NULL;
+	entry->value = BOOL_VALUE(true);
+	return true;
+}
+void tableRemoveWhite(Table *table) {
+	for (int i = 0; i < table->capacity; i++) {
+		Entry *e = &table->entries[i];
+		if (e->key != NULL && !e->key->obj.isMarked) {
+			tableRemove(table, e->key);
 		}
-		index = (index + 1) % t->capacity;
 	}
 }
+
 ObjString *findTableString(Table *t, const char *start, int length,
 						   uint32_t hash) {
 

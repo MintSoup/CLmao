@@ -11,7 +11,12 @@ static Obj *allocateObject(size_t size, ObjType type) {
 	Obj *object = (Obj *)reallocate(NULL, 0, size);
 	object->type = type;
 	object->next = vm.objects;
+	object->isMarked = false;
 	vm.objects = object;
+
+#ifdef DEBUG_LOGGC
+	printf("allocated %I64u bytes for %u at %p\n", size, type, (void *)object);
+#endif
 	return object;
 }
 
@@ -21,8 +26,9 @@ static ObjString *allocateString(const char *start, size_t length,
 	str->chars = (char *)start;
 	str->length = length;
 	str->hash = hash;
+	push(OBJ_VALUE((Obj *)str));
 	tableSet(&vm.strings, str, NULL_VALUE);
-
+	pop();
 	return str;
 }
 
@@ -107,13 +113,12 @@ ObjNative *newNative(NativeFn func) {
 	return nat;
 }
 ObjClosure *newClosure(ObjFunction *func) {
-	ObjClosure *cls = (ObjClosure *)ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
-	cls->func = func;
-
-	ObjUpvalue **upvalues = ALLOCATE_OBJ(ObjUpvalue *, OBJ_UPV);
+	ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue *, func->upvalueCount);
 	for (int i = 0; i < func->upvalueCount; i++) {
 		upvalues[i] = NULL;
 	}
+	ObjClosure *cls = (ObjClosure *)ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+	cls->func = func;
 	cls->upvalues = upvalues;
 	cls->upvalueCount = func->upvalueCount;
 	return cls;

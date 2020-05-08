@@ -26,4 +26,6 @@ bool tableGet(Table *t, ObjString *key, Value *value);
 bool tableRemove(Table *t, ObjString *key);
 ObjString *findTableString(Table *t, const char *start, int length,
 						   uint32_t hash);
+void tableRemoveWhite(Table *table);
+
 #endif
