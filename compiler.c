@@ -1,12 +1,12 @@
 #include "compiler.h"
 #include "commons.h"
 #include "dbg.h"
+#include "mem.h"
 #include "object.h"
 #include "value.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mem.h"
 
 typedef struct {
 	Token previous;
@@ -43,7 +43,12 @@ typedef struct {
 	bool isCaptured;
 } Local;
 
-typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
+typedef enum {
+	TYPE_FUNCTION,
+	TYPE_SCRIPT,
+	TYPE_METHOD,
+	TYPE_INIT
+} FunctionType;
 
 typedef struct {
 	int breaks[UINT8_COUNT];
@@ -71,9 +76,15 @@ typedef struct Compiler {
 	Upvalue upvalues[UINT8_COUNT];
 } Compiler;
 
+typedef struct ClassCompiler {
+	struct ClassCompiler *parent;
+	Token name;
+} ClassCompiler;
+
 Parser parser;
 Chunk *compilingChunk;
 Compiler *current = NULL;
+ClassCompiler *currentClass = NULL;
 
 #define check(x) (parser.current.type == x)
 
@@ -142,7 +153,13 @@ static void emitLoop(int where) {
 	emitBytes((back >> 8) & 0xff, back & 0xff);
 }
 
-static void emitReturn() { emitBytes(OP_NULL, OP_RETURN); }
+static void emitReturn() {
+	if (current->functionType != TYPE_INIT)
+		emitByte(OP_NULL);
+	else
+		emitBytes(OP_GET_LOCAL, 0);
+	emitByte(OP_RETURN);
+}
 
 static void emitPop(uint8_t pops) {
 	if (pops == 1)
@@ -163,8 +180,6 @@ uint8_t makeConstant(Value val) {
 static void emitConstant(Value value) {
 	emitBytes(OP_CONSTANT, makeConstant(value));
 }
-
-
 
 static void patchJump(int offset) {
 	int jump = currentChunk()->count - offset - 2;
@@ -192,8 +207,13 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
 	Local *local = &current->locals[current->localCount++];
 	local->depth = 0;
 	local->isCaptured = false;
-	local->name.start = "";
-	local->name.length = 0;
+	if (type != TYPE_FUNCTION) {
+		local->name.start = "this";
+		local->name.length = 4;
+	} else {
+		local->name.start = "";
+		local->name.length = 0;
+	}
 }
 
 static ObjFunction *endCompiler() {
@@ -249,6 +269,7 @@ static void forStatement();
 static void breakStatement();
 static void funcDeclaration();
 static void returnStatement();
+static void classDeclaration();
 
 static uint8_t identifierConstant(Token *token);
 
@@ -359,6 +380,21 @@ static uint8_t argumentList() {
 	return argCount;
 }
 
+static void dot(bool canAssign) {
+	consume(TOKEN_IDENTIFIER, "Expected field name after '.'");
+	uint8_t name = identifierConstant(&parser.previous);
+	if (match(TOKEN_EQUAL) && canAssign) {
+		expression();
+		emitBytes(OP_SET_FIELD, name);
+	} else if (match(TOKEN_LEFT_PAREN)) {
+		uint8_t args = argumentList();
+		emitBytes(OP_INVOKE, name);
+		emitByte(args);
+	} else {
+		emitBytes(OP_GET_FIELD, name);
+	}
+}
+
 static void call(bool canAssign) {
 	uint8_t argCount = argumentList();
 	emitBytes(OP_CALL, argCount);
@@ -461,10 +497,17 @@ static void unary(bool canAssign) {
 	}
 }
 
-static void map(bool canAssign){
+static void map(bool canAssign) {
 	expression();
 	consume(TOKEN_RIGHT_BRACKET, "Expected closing ']' after map expression");
 	emitByte(OP_MAP);
+}
+
+static void this_(bool canAssign) {
+	if (currentClass == NULL) {
+		error("Cannot use 'this' outside method");
+	}
+	variable(false);
 }
 
 ParseRule rules[] = {
@@ -473,7 +516,7 @@ ParseRule rules[] = {
 	{NULL, NULL, PREC_NONE},		 // TOKEN_LEFT_BRACE
 	{NULL, NULL, PREC_NONE},		 // TOKEN_RIGHT_BRACE
 	{NULL, NULL, PREC_NONE},		 // TOKEN_COMMA
-	{NULL, NULL, PREC_NONE},		 // TOKEN_DOT
+	{NULL, dot, PREC_CALL},			 // TOKEN_DOT
 	{unary, binary, PREC_TERM},		 // TOKEN_MINUS
 	{NULL, binary, PREC_TERM},		 // TOKEN_PLUS
 	{NULL, NULL, PREC_NONE},		 // TOKEN_SEMICOLON
@@ -506,7 +549,7 @@ ParseRule rules[] = {
 	{NULL, NULL, PREC_NONE},		 // TOKEN_PRINT
 	{NULL, NULL, PREC_NONE},		 // TOKEN_RETURN
 	{NULL, NULL, PREC_NONE},		 // TOKEN_SUPER
-	{NULL, NULL, PREC_NONE},		 // TOKEN_THIS
+	{this_, NULL, PREC_NONE},		 // TOKEN_THIS
 	{literal, NULL, PREC_NONE},		 // TOKEN_TRUE
 	{NULL, NULL, PREC_NONE},		 // TOKEN_VAR
 	{NULL, NULL, PREC_NONE},		 // TOKEN_WHILE
@@ -585,6 +628,9 @@ static void statement() {
 		breakStatement();
 	} else if (match(TOKEN_RETURN)) {
 		returnStatement();
+
+	} else if (match(TOKEN_CLASS)) {
+		classDeclaration();
 	} else {
 		expressionStatement();
 	}
@@ -874,7 +920,7 @@ static void function(FunctionType type) {
 	beginScope();
 
 	consume(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
-	while (!check(TOKEN_RIGHT_PAREN)) {
+	if (check(TOKEN_IDENTIFIER)) {
 		do {
 			if (++current->function->arity > 255)
 				errorAtCurrent("Cannot have more than 255 function arguments.");
@@ -910,20 +956,66 @@ static void returnStatement() {
 	if (match(TOKEN_SEMICOLON)) {
 		emitReturn();
 	} else {
+		if (current->functionType == TYPE_INIT) {
+			error("Cannot return from initializer.");
+		}
 		expression();
 		consume(TOKEN_SEMICOLON, "Expected ';' after return.");
 		emitByte(OP_RETURN);
 	}
 }
 
+void markCompilerRoots() {
+	Compiler *c = current;
 
-void markCompilerRoots(){
-	Compiler* c = current;
-
-	while(c != NULL){
-		markObject((Obj*) c->function);
+	while (c != NULL) {
+		markObject((Obj *)c->function);
 		c = c->parent;
 	}
+}
+
+static void method() {
+	consume(TOKEN_FUNC, "Expected 'func' for a method declaration.");
+	consume(TOKEN_IDENTIFIER, "Expected method name.");
+
+	uint8_t name = identifierConstant(&parser.previous);
+	if (parser.previous.length == currentClass->name.length &&
+		memcmp(parser.previous.start, currentClass->name.start,
+			   parser.previous.length) == 0) {
+		function(TYPE_INIT);
+
+	} else
+		function(TYPE_METHOD);
+
+	emitBytes(OP_METHOD, name);
+}
+
+static void classDeclaration() {
+	consume(TOKEN_IDENTIFIER, "Expected class name.");
+	Token className = parser.previous;
+	uint8_t name = identifierConstant(&parser.previous);
+
+	declareVariable();
+	emitBytes(OP_CLASS, name);
+	defineVariable(name);
+
+	ClassCompiler cc;
+	cc.name = className;
+	cc.parent = currentClass;
+	currentClass = &cc;
+
+	namedVariable(className, false);
+
+	consume(TOKEN_LEFT_BRACE, "Expected '{' after class name");
+
+	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+		method();
+	}
+
+	consume(TOKEN_RIGHT_BRACE, "Expected '}' after class name");
+	emitByte(OP_POP);
+
+	currentClass = currentClass->parent;
 }
 
 #undef check

@@ -10,7 +10,7 @@
 // #define DEBUG_CLOCKS
 // #define DEBUG_STRESSGC
 // #define DEBUG_LOGGC
-//#define DEBUG_EXPOSEGC
+// #define DEBUG_EXPOSEGC
 
 
 #define UINT8_COUNT (UINT8_MAX + 1)

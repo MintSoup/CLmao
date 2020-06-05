@@ -7,9 +7,9 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdlib.h>
 VM vm;
 
 static void resetStack();
@@ -17,6 +17,8 @@ static Value peek(int distance);
 static void runtimeError(const char *format, ...);
 static bool callValue(Value callee, int args);
 static void defineNative(const char *name, NativeFn function);
+static bool invokeFromClass(ObjClass *klass, ObjString *name, uint8_t args);
+static bool invoke(ObjString *name, uint8_t args);
 
 #ifdef DEBUG_EXPOSEGC
 static Value gcNative(int argCount, Value *args) {
@@ -43,9 +45,18 @@ static Value slenNative(int argCount, Value *args) {
 	}
 	return NUM_VALUE((double)AS_STRING(*args)->length);
 }
+
+static Value sqrtNative(int argCount, Value *args) {
+	if (argCount != 1 || !IS_NUM(*args)) {
+		runtimeError("Builtin sqrt function takes 1 number argument.");
+		vm.nativeError = true;
+	}
+	return NUM_VALUE((double)sqrt(AS_NUM(*args)));
+}
+
 static Value strNative(int argCount, Value *args) {
 	if (argCount != 1) {
-		runtimeError("Builtin slen function takes 1.");
+		runtimeError("Builtin str function takes 1 argument.");
 		vm.nativeError = true;
 	}
 	ObjString *r;
@@ -98,6 +109,7 @@ void initVM() {
 	defineNative("clock", clockNative);
 	defineNative("slen", slenNative);
 	defineNative("str", strNative);
+	defineNative("sqrt", sqrtNative);
 #ifdef DEBUG_EXPOSEGC
 	defineNative("gc", gcNative);
 #endif
@@ -169,6 +181,24 @@ static void closeUpvalues(Value *last) {
 		upvalue->location = &upvalue->closed;
 		vm.openUpvalues = upvalue->next;
 	}
+}
+
+static void declareMethod(ObjString *name) {
+	Value method = peek(0);
+	ObjClass *klass = AS_CLASS(peek(1));
+	tableSet(&klass->methods, name, method);
+	pop();
+}
+static bool bindMethod(ObjClass *klass, ObjString *name) {
+	Value method;
+	if (!tableGet(&klass->methods, name, &method)) {
+		runtimeError("Undefined property: %s", name->chars);
+		return false;
+	}
+	ObjMethod *bound = newMethod(peek(0), AS_CLOSURE(method));
+	pop();
+	push(OBJ_VALUE((Obj *)bound));
+	return true;
 }
 
 static InterpretResult run() {
@@ -432,7 +462,7 @@ static InterpretResult run() {
 			closeUpvalues(vm.stackTop - 1);
 			pop();
 			break;
-		case OP_MAP:
+		case OP_MAP: {
 			if (!(IS_INT(peek(0)) && round(AS_NUM(peek(0))) >= 0)) {
 				runtimeError("Map index can only be positive integer.");
 				return INTERPRET_RUNTIME_ERROR;
@@ -451,6 +481,57 @@ static InterpretResult run() {
 			ObjString *nstr = copyString(str->chars + index, 1);
 			push(OBJ_VALUE((Obj *)nstr));
 			break;
+		}
+		case OP_CLASS: {
+			push(OBJ_VALUE((Obj *)newClass(READ_STRING())));
+			break;
+		}
+		case OP_GET_FIELD: {
+			if (!IS_INSTANCE(peek(0))) {
+				runtimeError("Only instances can have fields");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			ObjInstance *instance = AS_INSTANCE(peek(0));
+			Value field;
+			ObjString *name = READ_STRING();
+			if (tableGet(&instance->fields, name, &field)) {
+				pop();
+				push(field);
+				break;
+			} else if (bindMethod(instance->klass, name)) {
+				break;
+			} else {
+				runtimeError("Invalid field: '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+		}
+		case OP_SET_FIELD: {
+			if (!IS_INSTANCE(peek(1))) {
+				runtimeError("Only instances can have fields");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			ObjInstance *instance = AS_INSTANCE(peek(1));
+			ObjString *name = READ_STRING();
+
+			tableSet(&instance->fields, name, peek(0));
+			Value set = pop();
+			pop();
+			push(set);
+			break;
+		}
+		case OP_METHOD: {
+			declareMethod(READ_STRING());
+			break;
+		}
+		case OP_INVOKE: {
+			ObjString *name = READ_STRING();
+			uint8_t args = READ_BYTE();
+			if (!invoke(name, args))
+				return INTERPRET_RUNTIME_ERROR;
+
+			frame = &vm.frames[vm.frameCount - 1];
+			break;
+		}
 		default: {
 			runtimeError("Cringe unknown instruction");
 			return INTERPRET_RUNTIME_ERROR;
@@ -542,8 +623,10 @@ static bool call(ObjClosure *closure, int args) {
 					 closure->func->arity, args);
 		return false;
 	}
-	if (vm.frameCount == FRAMES_MAX)
+	if (vm.frameCount == FRAMES_MAX) {
 		runtimeError("Stack overflow.");
+		return false;
+	}
 	Callframe *frame = &vm.frames[vm.frameCount++];
 	frame->closure = closure;
 	frame->ip = closure->func->chunk.code;
@@ -567,6 +650,23 @@ static bool callValue(Value callee, int args) {
 			push(result);
 			return true;
 		}
+		case OBJ_CLASS: {
+			ObjClass *klass = AS_CLASS(callee);
+			vm.stackTop[-args - 1] = OBJ_VALUE((Obj *)newInstance(klass));
+			Value constructor;
+			if (tableGet(&klass->methods, klass->name, &constructor)) {
+				return call(AS_CLOSURE(constructor), args);
+			} else if (args != 0) {
+				runtimeError("Expected 0 arguments, received %d.", args);
+				return false;
+			}
+			return true;
+		}
+		case OBJ_METHOD: {
+			ObjMethod *method = AS_METHOD(callee);
+			vm.stackTop[-args - 1] = method->parent;
+			return call(method->closure, args);
+		}
 
 		default:
 			break;
@@ -575,4 +675,28 @@ static bool callValue(Value callee, int args) {
 
 	runtimeError("Only classes and functions are callable");
 	return false;
+}
+static bool invokeFromClass(ObjClass *klass, ObjString *name, uint8_t args) {
+	Value method;
+	if (!tableGet(&klass->methods, name, &method)) {
+		runtimeError("Undefined property: %s", name->chars);
+		return false;
+	}
+	return call(AS_CLOSURE(method), args);
+}
+
+static bool invoke(ObjString *name, uint8_t args) {
+	Value receiver = peek(args);
+	if (!IS_INSTANCE(receiver)) {
+		runtimeError("Only instances can have methods.");
+		return false;
+	}
+	ObjInstance *instance = AS_INSTANCE(receiver);
+	Value field;
+	if (tableGet(&instance->fields, name, &field)) {
+		vm.stackTop[-args - 1] = field;
+		return callValue(field, args);
+	}
+
+	return invokeFromClass(instance->klass, name, args);
 }

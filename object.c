@@ -91,7 +91,22 @@ void printObject(Value val) {
 		break;
 	}
 	case OBJ_UPV: {
-		puts("upvalue");
+		puts("<upvalue>");
+		break;
+	}
+	case OBJ_CLASS: {
+		printf("<class ");
+		printObject(OBJ_VALUE((Obj *)AS_CLASS(val)->name));
+		puts(">");
+		break;
+	}
+	case OBJ_INSTANCE: {
+		ObjInstance *instance = (ObjInstance *)AS_OBJ(val);
+		printf("<instance of %s>\n", instance->klass->name->chars);
+		break;
+	}
+	case OBJ_METHOD: {
+		printFunction(AS_METHOD(val)->closure->func);
 		break;
 	}
 	default:
@@ -128,4 +143,22 @@ ObjUpvalue *newUpvalue(Value *slot) {
 	upvalue->location = slot;
 	upvalue->closed = NULL_VALUE;
 	return upvalue;
+}
+ObjClass *newClass(ObjString *name) {
+	ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+	klass->name = name;
+	initTable(&klass->methods);
+	return klass;
+}
+ObjInstance *newInstance(ObjClass *klass) {
+	ObjInstance *instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+	instance->klass = klass;
+	initTable(&instance->fields);
+	return instance;
+}
+ObjMethod *newMethod(Value parent, ObjClosure *function) {
+	ObjMethod *method = ALLOCATE_OBJ(ObjMethod, OBJ_METHOD);
+	method->parent = parent;
+	method->closure = function;
+	return method;
 }

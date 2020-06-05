@@ -1,4 +1,18 @@
-{
-    let cringe = "sdasdasdasdasddasdsadasdasdasdasdasdasdasd";
-    while(true) cringe = cringe + "xd";
+class Vector{
+    func Vector(x, y){
+        this.x = x;
+        this.y = y;
+    }
+    func magnitude(){
+        return sqrt(this.x * this.x + this.y * this.y);
+    }
+    func add(b){
+        return Vector(this.x + b.x, this.y + b.y);
+    }
 }
+
+let a = Vector(3, 4);
+let b = Vector(1, 1);
+print(a.magnitude());
+print(b.magnitude());
+print(a.add(b).magnitude());

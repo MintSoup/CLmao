@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "commons.h"
+#include "table.h"
 #include "value.h"
 
 #define OBJ_TYPE(x) (AS_OBJ(x)->type)
@@ -13,19 +14,28 @@
 #define AS_NATIVE(x) ((ObjNative *)AS_OBJ(x))
 #define AS_CLOSURE(x) ((ObjClosure *)AS_OBJ(x))
 #define AS_UPV(x) ((ObjUpvalue *)AS_OBJ(x))
+#define AS_CLASS(x) ((ObjClass *)AS_OBJ(x))
+#define AS_INSTANCE(x) ((ObjInstance *)AS_OBJ(x))
+#define AS_METHOD(x) ((ObjMethod *)AS_OBJ(x))
 
 #define IS_STRING(x) (isObjType(x, OBJ_STRING))
 #define IS_FUNCTION(x) (isObjType(x, OBJ_FUNCTION))
 #define IS_NATIVE(x) (isObjType(x, OBJ_NATIVE))
 #define IS_CLOSURE(x) (isObjType(x, OBJ_CLOSURE))
 #define IS_UPV(x) (isObjType(x, OBJ_UPV))
+#define IS_CLASS(x) (isObjType(x, OBJ_CLASS))
+#define IS_INSTANCE(x) (isObjType(x, OBJ_INSTANCE))
+#define IS_METHOD(x) (isObjType(x, OBJ_METHOD))
 
 typedef enum {
 	OBJ_STRING,
 	OBJ_FUNCTION,
 	OBJ_NATIVE,
 	OBJ_CLOSURE,
-	OBJ_UPV
+	OBJ_UPV,
+	OBJ_CLASS,
+	OBJ_INSTANCE,
+	OBJ_METHOD
 } ObjType;
 
 struct sObj {
@@ -70,6 +80,24 @@ typedef struct {
 	int upvalueCount;
 } ObjClosure;
 
+typedef struct {
+	Obj obj;
+	ObjString *name;
+	Table methods;
+} ObjClass;
+
+typedef struct {
+	Obj obj;
+	ObjClass *klass;
+	Table fields;
+} ObjInstance;
+
+typedef struct {
+	Obj obj;
+	Value parent;
+	ObjClosure *closure;
+} ObjMethod;
+
 ObjString *copyString(const char *start, size_t length);
 
 static inline bool isObjType(Value x, ObjType type) {
@@ -84,5 +112,7 @@ ObjFunction *newFunction();
 ObjNative *newNative(NativeFn func);
 ObjClosure *newClosure(ObjFunction *func);
 ObjUpvalue *newUpvalue(Value *slot);
-
+ObjClass *newClass(ObjString *name);
+ObjInstance *newInstance(ObjClass *klass);
+ObjMethod *newMethod(Value parent, ObjClosure *function);
 #endif

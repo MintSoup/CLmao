@@ -60,6 +60,21 @@ static void freeObject(Obj *b) {
 		FREE(ObjUpvalue, (ObjUpvalue *)b);
 		break;
 	}
+	case OBJ_CLASS: {
+		ObjClass *c = (ObjClass *)b;
+		freeTable(&c->methods);
+		FREE(ObjClass, c);
+		break;
+	}
+	case OBJ_INSTANCE: {
+		ObjInstance *instance = (ObjInstance *)b;
+		freeTable(&instance->fields);
+		FREE(ObjInstance, instance);
+		break;
+	}
+	case OBJ_METHOD: {
+		FREE(ObjMethod, b);
+	}
 	}
 }
 
@@ -150,6 +165,24 @@ static void blackenObject(Obj *obj) {
 		}
 		break;
 	}
+	case OBJ_CLASS: {
+		ObjClass *klass = (ObjClass *)obj;
+		markObject((Obj *)klass->name);
+		markTable(&klass->methods);
+		break;
+	}
+	case OBJ_INSTANCE: {
+		ObjInstance *instance = (ObjInstance *)obj;
+		markObject((Obj *)instance->klass);
+		markTable(&instance->fields);
+		break;
+	}
+	case OBJ_METHOD: {
+		ObjMethod *m = (ObjMethod *)obj;
+		markObject((Obj *)m->closure);
+		markValue(m->parent);
+		break;
+	}
 	}
 
 #ifdef DEBUG_LOGGC
@@ -185,7 +218,6 @@ static void sweep() {
 			freeObject(unreached);
 		}
 	}
-
 }
 
 void gc() {
